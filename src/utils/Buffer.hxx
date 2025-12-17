@@ -515,7 +515,6 @@ public:
                 ::free(p);
             } while (true);
         }
-#endif
         Bucket::destroy(buckets);
     }
 

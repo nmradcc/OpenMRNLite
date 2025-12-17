@@ -168,7 +168,6 @@ public:
     {
         reserveUnusedAliases_ = count;
     }
-#endif
 
 private:
     /** Listens to incoming CAN frames and handles alias conflicts. */
