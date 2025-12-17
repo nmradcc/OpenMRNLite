@@ -40,7 +40,7 @@
 #define ESP_IDF_VERSION 0
 #define ESP_IDF_VERSION_VAL(a,b,c) 1
 
-#ifdef __FreeRTOS__
+#if defined(__FreeRTOS__) || defined(OPENMRN_FEATURE_RTOS_THREADX) || defined(OPENMRN_FEATURE_RTOS_CMSIS_V2)
 /// Compiles the FreeRTOS event group based ::select() implementation.
 #define OPENMRN_FEATURE_DEVICE_SELECT 1
 /// Adds implementations for ::read ::write etc, with fd table.
@@ -50,7 +50,7 @@
 #define OPENMRN_FEATURE_REENT 1
 #endif
 
-#if defined(__FreeRTOS__)
+#if defined(__FreeRTOS__) || defined(OPENMRN_FEATURE_RTOS_THREADX) || defined(OPENMRN_FEATURE_RTOS_CMSIS_V2)
 // Note: this is not using OPENMRN_FEATURE_DEVICE_SELECT due to other usages
 // of that macro.
 /// Adds support for FD based CAN interfaces.
@@ -67,7 +67,7 @@
 /// Enables the code using ::fstat to confirm if the file handle is a socket.
 #define OPENMRN_HAVE_SOCKET_FSTAT 1
 
-#if !defined(__FreeRTOS__) && !defined(ARDUINO)
+#if !defined(__FreeRTOS__) && !defined(OPENMRN_FEATURE_RTOS_THREADX) && !defined(OPENMRN_FEATURE_RTOS_CMSIS_V2) && !defined(ARDUINO)
 /// Uses ::pselect in the Executor for sleep and pkill for waking up.
 #define OPENMRN_HAVE_PSELECT 1
 #endif
@@ -81,7 +81,7 @@
 #define OPENMRN_FEATURE_SINGLE_THREADED 1
 #endif
 
-#if defined(__FreeRTOS__)
+#if defined(__FreeRTOS__) || defined(OPENMRN_FEATURE_RTOS_THREADX) || defined(OPENMRN_FEATURE_RTOS_CMSIS_V2)
 /// Use os_mutex_... implementation based on FreeRTOS mutex and semaphores.
 #define OPENMRN_FEATURE_MUTEX_FREERTOS 1
 

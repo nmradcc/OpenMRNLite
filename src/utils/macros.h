@@ -186,7 +186,6 @@ extern const char* g_death_file;
 /// Declares (on the ESP8266) that the current function is executed
 /// often and should be placed in the instruction RAM.
 #define ICACHE_RAM_ATTR
-#endif
 
 /// Retrieve a parent pointer from a member class variable. UNSAFE.
 /// Usage:
