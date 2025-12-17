@@ -34,9 +34,7 @@
 #ifndef _I2C_HXX_
 #define _I2C_HXX_
 
-#if defined (__linux__)
-    #include <linux/i2c.h>
-#elif defined (__FreeRTOS__) || defined(ESP_PLATFORM)
+#if defined (__FreeRTOS__) || defined(ESP_PLATFORM)
     #include <stdint.h>
     /** Used in @ref i2c_rdwr_ioctl_data to describe a transaction segment. */
     struct i2c_msg

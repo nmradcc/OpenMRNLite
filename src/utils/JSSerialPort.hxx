@@ -35,6 +35,9 @@
 #ifndef _UTILS_JSSERIALPORT_HXX_
 #define _UTILS_JSSERIALPORT_HXX_
 
+// __EMSCRIPTEN__ support has been removed
+
+/*
 #ifdef __EMSCRIPTEN__
 
 #include <emscripten.h>
@@ -131,4 +134,5 @@ private:
 };
 
 #endif // __EMSCRIPTEN__
+*/
 #endif // _UTILS_JSTCPCLIENT_HXX_

@@ -367,23 +367,6 @@ public:
     /// Adds a gridconnect port to the CAN bus.
     void add_gridconnect_port(const char *path, Notifiable *on_exit = nullptr);
 
-#if defined(__linux__) || defined(__MACH__)
-    /// Adds a gridconnect port to the CAN bus with setting the TTY options to
-    /// raw. Suitablefor linux /dev/ttyACMxx devices. The most important option
-    /// this call sets is to not echo characters coming in from the device back
-    /// to the device. Echoing data back causes alias allocation problems and
-    /// nodes on the bus repeatedly dropping their allocated aliases.
-    void add_gridconnect_tty(const char *device, Notifiable *on_exit = nullptr);
-#endif
-#if defined(__linux__)
-    /// Adds a CAN bus port with select-based asynchronous driver API.
-    /// @params device CAN device name, for example: "can0" or "can1"
-    /// @params loopback 1 to enable loopback localy to other open references,
-    ///                  0 to enable loopback localy to other open references,
-    ///                  in most cases, this paramter won't matter
-    void add_socketcan_port_select(const char *device, int loopback = 1);
-#endif
-
     /// Starts a TCP server on the specified port in listening mode. Each
     /// incoming connection will be assumed to be in gridconnect protocol and
     /// will be added to the gridconnect hub.

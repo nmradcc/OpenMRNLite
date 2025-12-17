@@ -170,35 +170,6 @@ void crc3_crc16_ibm(const void* data, size_t length_bytes, uint16_t* checksum)
     uint16_t state2 = crc_16_ibm_init_value;
     uint16_t state3 = crc_16_ibm_init_value;
 
-#ifdef ESP_NONOS
-    // Aligned reads only.
-    const uint32_t* payload = static_cast<const uint32_t*>(data);
-    HASSERT((((uint32_t)payload) & 3) == 0);
-    uint32_t cword = 0;
-    for (size_t i = 1; i <= length_bytes; ++i)
-    {
-        if ((i & 3) == 1)
-        {
-            cword = payload[(i - 1) >> 2];
-        }
-        else
-        {
-            cword >>= 8;
-        }
-        uint8_t cbyte = cword & 0xff;
-        crc_16_ibm_add(state1, cbyte);
-        if (i & 1)
-        {
-            // odd byte
-            crc_16_ibm_add(state2, cbyte);
-        }
-        else
-        {
-            // even byte
-            crc_16_ibm_add(state3, cbyte);
-        }
-    }
-#else
     const uint8_t *payload = static_cast<const uint8_t*>(data);
     for (size_t i = 1; i <= length_bytes; ++i)
     {
@@ -214,7 +185,6 @@ void crc3_crc16_ibm(const void* data, size_t length_bytes, uint16_t* checksum)
             crc_16_ibm_add(state3, payload[i-1]);
         }
     }
-#endif
 
     checksum[0] = crc_16_ibm_finish(state1);
     checksum[1] = crc_16_ibm_finish(state2);

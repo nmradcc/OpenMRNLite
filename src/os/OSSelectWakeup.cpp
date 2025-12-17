@@ -33,9 +33,6 @@
 
 #include "os/OSSelectWakeup.hxx"
 #include "utils/logging.h"
-#if defined(__MACH__)
-#define _DARWIN_C_SOURCE // pselect
-#endif
 
 void empty_signal_handler(int)
 {

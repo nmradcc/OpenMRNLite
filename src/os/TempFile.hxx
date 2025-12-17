@@ -126,9 +126,7 @@ public:
       HASSERT(ret >= 0);
       ofs += ret;
     }
-#ifndef __WINNT__    
     fsync(fd_);
-#endif    
   }
 
 private:

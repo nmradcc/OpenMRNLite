@@ -51,20 +51,6 @@
 #include "FreeRTOS.h"
 #include "task.h"
 
-#elif defined(__WIN32__)
-
-#include <winsock2.h>
-#include <ws2tcpip.h> /* socklen_t */
-#include <time.h>
-#include <signal.h>
-
-#elif defined(ESP_NONOS)
-
-#include <sys/select.h>
-#include <sched.h>
-#include <signal.h>
-#include <user_interface.h>
-
 #else
 
 #include <sys/select.h>
@@ -106,40 +92,6 @@ long long rtcOffset = 0;
  * version) that does not forward these function calls to the implementations
  * we have. We are thus forced to override their weak definition of these
  * functions. */
-#if defined(TARGET_PIC32MX) || defined(ESP_NONOS)
-#include "reent.h"
-
-#ifndef _READ_WRITE_RETURN_TYPE
-#define _READ_WRITE_RETURN_TYPE ssize_t
-#endif
-
-int open(const char* b, int flags, ...)
-{
-    return _open_r(_impure_ptr, b, flags, 0);
-}
-int close(int fd)
-{
-    return _close_r(_impure_ptr, fd);
-}
-_READ_WRITE_RETURN_TYPE read(int fd, void* buf, size_t count)
-{
-    return _read_r(_impure_ptr, fd, buf, count);
-}
-_READ_WRITE_RETURN_TYPE write(int fd, const void* buf, size_t count)
-{
-    return _write_r(_impure_ptr, fd, buf, count);
-}
-off_t lseek(int fd, off_t offset, int whence)
-{
-    return _lseek_r(_impure_ptr, fd, offset, whence);
-}
-int fstat(int fd, struct stat* buf)
-{
-    return _fstat_r(_impure_ptr, fd, buf);
-}
-
-#endif
-
 
 #if OPENMRN_FEATURE_THREAD_FREERTOS
 /// Task list entriy
@@ -224,95 +176,6 @@ int os_thread_once(os_thread_once_t *once, void (*routine)(void))
         }
     }
 
-    return 0;
-}
-#endif
-
-#if defined (__WIN32__)
-/** Windows does not support pipes, so we made our own with a pseudo socketpair.
- * @param fildes fildes[0] is open for reading, filedes[1] is open for writing
- * @return 0 upon success, else -1 with errno set to indicate error
- */
-int pipe(int fildes[2])
-{
-    struct sockaddr_in addr;  
-    int listener, connector, acceptor;
-    socklen_t addrlen = sizeof(addr);
-
-    if ((listener = socket(AF_INET, SOCK_STREAM, 0)) <= 0)
-    {
-        errno = EMFILE;
-        return -1;
-    }
-    if ((connector = socket(AF_INET, SOCK_STREAM, 0)) <= 0)
-    {
-        closesocket(listener);
-        errno = EMFILE;
-        return -1;
-    }
-    
-    memset(&addr, 0, sizeof(addr));
-    addr.sin_family = AF_INET;
-    addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
-    addr.sin_port = 0; 
-
-    int reuse = 0;
-    if (setsockopt(listener, SOL_SOCKET, SO_REUSEADDR, 
-                   (char*)&reuse, (socklen_t)sizeof(reuse)) < 0)
-    {
-        closesocket(listener);
-        closesocket(connector);
-        errno = EMFILE;
-        return -1;
-    }
-
-    if (bind(listener, (const struct sockaddr*)&addr, sizeof(addr)) < 0)
-    {
-        closesocket(listener);
-        closesocket(connector);
-        errno = EMFILE;
-        return -1;
-    }
-    
-    if  (getsockname(listener, (struct sockaddr*)&addr, &addrlen) < 0)
-    {
-        closesocket(listener);
-        closesocket(connector);
-        errno = EMFILE;
-        return -1;
-    }
-
-    if (listen(listener, 1) < 0)
-    {
-        closesocket(listener);
-        closesocket(connector);
-        errno = EMFILE;
-        return -1;
-    }
-
-    if (connect(connector, (const struct sockaddr*)&addr, addrlen) < 0)
-    {
-        closesocket(listener);
-        closesocket(connector);
-        errno = EMFILE;
-        return -1;
-    }
-   
-    if ((acceptor = accept(listener, NULL, NULL)) < 0)
-    {
-        closesocket(listener);
-        closesocket(connector);
-        errno = EMFILE;
-        return  -1;
-    }
-
-    int flag = 1;
-    setsockopt(connector, IPPROTO_TCP, TCP_NODELAY, (char*)&flag, sizeof(int));
-    setsockopt(acceptor, IPPROTO_TCP, TCP_NODELAY, (char*)&flag, sizeof(int));
-
-    fildes[0] = connector;
-    fildes[1] = acceptor;
-    closesocket(listener);
     return 0;
 }
 #endif
@@ -576,22 +439,6 @@ long long os_get_time_monotonic(void)
     portTickType tick = xTaskGetTickCount();
     time = ((long long)tick) << NSEC_TO_TICK_SHIFT;
     time += hw_get_partial_tick_time_nsec();
-#elif defined (__MACH__)
-    /* get the timebase info */
-    mach_timebase_info_data_t info;
-    mach_timebase_info(&info);
-    
-    /* get the timestamp */
-    time = (long long)mach_absolute_time();
-    
-    /* convert to nanoseconds */
-    time *= info.numer;
-    time /= info.denom;
-#elif defined (__WIN32__)
-    struct timeval tv;
-    gettimeofday(&tv, NULL);
-    time = ((long long)tv.tv_sec * 1000LL * 1000LL * 1000LL) +
-           ((long long)tv.tv_usec * 1000LL);
 #elif defined(ARDUINO)
     // redeclare micros() prototype to remove compiler warning
     unsigned long micros();
@@ -612,24 +459,10 @@ long long os_get_time_monotonic(void)
     time <<= 32;
     time += new_micros;
     time *= 1000;    // Convert micros to nanos
-#elif defined(ESP_NONOS)
-    static uint32_t clockmul = 0;
-    if (clockmul == 0) {
-        clockmul = system_rtc_clock_cali_proc();
-        clockmul *= 1000;
-        clockmul >>= 10;
-    }
-    time = system_get_rtc_time();
-    time *= clockmul;
-    time >>= 2;
 #else
 
     struct timespec ts;
-#if defined (__nuttx__)
-    clock_gettime(CLOCK_REALTIME, &ts);
-#else
     clock_gettime(CLOCK_MONOTONIC, &ts);
-#endif
     time = ((long long)ts.tv_sec * 1000000000LL) + ts.tv_nsec;
 
 #ifdef GTEST
@@ -658,23 +491,6 @@ long long os_get_time_monotonic(void)
     
     return time;
 }
-
-#if defined(__EMSCRIPTEN__)
-int os_thread_once(os_thread_once_t *once, void (*routine)(void))
-{
-    if (once->state == OS_THREAD_ONCE_NEVER)
-    {
-        once->state = OS_THREAD_ONCE_INPROGRESS;
-        routine();
-        once->state = OS_THREAD_ONCE_DONE;
-    }
-    else if (once->state == OS_THREAD_ONCE_INPROGRESS)
-    {
-        DIE("Recursive call to os_thread_once.");
-    }
-    return 0;
-}
-#endif
 
 #if defined (__FreeRTOS__)
 /* standard C library hooks for multi-threading */
@@ -750,8 +566,7 @@ int usleep(useconds_t usec)
 void abort(void)
 {
 #if defined(TARGET_LPC2368) || defined(TARGET_LPC11Cxx) || \
-    defined(TARGET_LPC1768) || defined(GCC_ARMCM3) || defined (GCC_ARMCM0) || \
-    defined(TARGET_PIC32MX)
+    defined(TARGET_LPC1768) || defined(GCC_ARMCM3) || defined (GCC_ARMCM0)
     diewith(BLINK_DIE_ABORT);
 #endif
     for (;;)
@@ -870,23 +685,10 @@ void vApplicationIdleHook( void )
     xTaskResumeAll();
 }
 
-#ifdef TARGET_PIC32MX
-static void __attribute__((nomips16)) os_yield_trampoline(void)
-{
-    taskYIELD();
-}
-
-void __attribute__((nomips16)) os_isr_exit_yield_test(int woken)
-{
-   portEND_SWITCHING_ISR(woken); 
-}
-
-#else
 static inline void __attribute__((always_inline)) os_yield_trampoline(void)
 {
     taskYIELD();
 }
-#endif
 
 /** Entry point to the main thread.
  * @param arg unused argument
@@ -927,9 +729,7 @@ int ignore_fn(void)
 
 #if !defined(ARDUINO) && !defined(ESP_PLATFORM)
 
-#if !defined (__MINGW32__)
 int main(int argc, char *argv[]) __attribute__ ((weak));
-#endif
 
 /** Entry point to program.
  * @param argc number of command line arguments
@@ -975,11 +775,6 @@ int main(int argc, char *argv[])
 
     vTaskStartScheduler();
 #else
-#if defined (__WIN32__)
-    /* enable Windows networking */
-    WSADATA wsa_data;
-    WSAStartup(WINSOCK_VERSION, &wsa_data);
-#endif
     return appl_main(argc, argv);
 #endif
 }
@@ -988,12 +783,4 @@ int main(int argc, char *argv[])
 
 #if defined(ARDUINO)
 unsigned critical_nesting;
-#endif
-
-#if 0 && defined(ESP_NONOS)
-struct _reent *_impure_ptr = NULL;
-static int my_errno;
-int* __errno(void) {
-    return &my_errno;
-}
 #endif

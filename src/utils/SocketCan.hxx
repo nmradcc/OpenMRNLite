@@ -35,15 +35,4 @@
 #ifndef _UTILS_SOCKETCAN_HXX_
 #define _UTILS_SOCKETCAN_HXX_
 
-#if defined(__linux__)
-
-/// Opens a SocketCan socket.
-/// @param device the name of the CAN device, e.g. can0
-/// @param loopback 1 to enable loopback locally to other open references,
-///                 0 to disable loopback locally to other open references.
-/// @return an open socket file descriptor, or -1 if there was an error.
-int socketcan_open(const char *device, int loopback);
-
-#endif
-
 #endif // _UTILS_SOCKETCAN_HXX_

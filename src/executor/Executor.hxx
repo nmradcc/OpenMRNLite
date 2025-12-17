@@ -50,12 +50,6 @@
 #include "utils/macros.h"
 #include "os/OSSelectWakeup.hxx"
 
-#ifdef ESP_NONOS
-extern "C" {
-#include <ets_sys.h>
-}
-#endif
-
 class ActiveTimers;
 
 /** This class implements an execution of tasks pulled off an input queue.
@@ -307,12 +301,7 @@ public:
     {
         queue_.insert(
             msg, priority >= NUM_PRIO ? NUM_PRIO - 1 : priority);
-#ifdef ESP_NONOS
-        extern void wakeup_executor(ExecutorBase* executor);
-        wakeup_executor(this);
-#else
         selectHelper_.wakeup();
-#endif
     }
 
 #if OPENMRN_FEATURE_RTOS_FROM_ISR

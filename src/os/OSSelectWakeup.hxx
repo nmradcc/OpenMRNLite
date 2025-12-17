@@ -48,9 +48,7 @@
 #include <signal.h>
 #endif
 
-#ifdef __WINNT__
-#include <winsock2.h>
-#elif OPENMRN_HAVE_SELECT
+#if OPENMRN_HAVE_SELECT
 #include <sys/select.h>
 #endif
 

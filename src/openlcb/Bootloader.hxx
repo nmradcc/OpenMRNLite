@@ -157,9 +157,6 @@ extern "C" {
 /// unit tests instead of sleeping to avoid race conditions.
 extern volatile unsigned g_bootloader_busy;
 volatile unsigned g_bootloader_busy = 1;
-#ifdef __linux__
-Atomic g_bootloader_lock;
-#endif
 
 #ifdef BOOTLOADER_STREAM
 /// Protocol support bitmask that the bootloader should export.
@@ -1058,9 +1055,6 @@ bool bootloader_loop()
         state_.request_reinit_node = false;
     }
     {
-#ifdef __linux__
-        AtomicHolder h(&g_bootloader_lock);
-#endif
         if (!state_.input_frame_full && read_can_frame(&state_.input_frame))
         {
             state_.input_frame_full = 1;
@@ -1131,9 +1125,6 @@ void bootloader_entry()
     while (true)
     {
         if (bootloader_loop()) return;
-#ifdef __linux__
-        usleep(10);
-#endif
     } // while true
     try_send_can_frame(state_.output_frame);
 }

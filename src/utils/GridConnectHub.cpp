@@ -402,15 +402,6 @@ struct GcPacketPrinter::Impl : public CanHubPortInterface
         *p = 0;
         if (timestamped_)
         {
-#if defined(__linux__) || defined(__MACH__)
-            struct timeval tv;
-            gettimeofday(&tv, nullptr);
-            struct tm t;
-            localtime_r(&tv.tv_sec, &t);
-            fprintf(stderr, "%04d-%02d-%02d %02d:%02d:%02d:%06ld [%p] ",
-                t.tm_year + 1900, t.tm_mon + 1, t.tm_mday, t.tm_hour, t.tm_min,
-                t.tm_sec, (long)tv.tv_usec, message->data()->skipMember_);
-#endif
         }
         fprintf(stderr, "%s", str);
         if (config_gc_generate_newlines() != 1)

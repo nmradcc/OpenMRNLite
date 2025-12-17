@@ -33,9 +33,7 @@
 
 #include "logging.h"
 
-#if defined(__linux__) || defined(__MACH__)
-char logbuffer[4096];
-#elif defined(ESP_PLATFORM)
+#if defined(ESP_PLATFORM)
 char logbuffer[1024];
 #else
 /// Temporary buffer to sprintf() the log lines into.
@@ -56,8 +54,7 @@ void log_output(char* buf, int size) {
     send_stdio_serial_message(buf);
 }
 
-#elif defined(__linux__) || defined(__MACH__) || defined(__EMSCRIPTEN__) || \
-      defined(ESP_PLATFORM)
+#elif defined(ESP_PLATFORM)
 
 #include "utils/stdio_logging.h"
 

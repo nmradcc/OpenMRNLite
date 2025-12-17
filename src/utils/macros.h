@@ -52,13 +52,6 @@ using std::pair;
 
 #include <stdlib.h>   // for abort
 
-#if defined(__EMSCRIPTEN__) 
-#if defined(EXPECT_DEATH)
-#undef EXPECT_DEATH
-#endif
-#define EXPECT_DEATH(x...) 
-#endif
-
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -115,7 +108,7 @@ extern const char* g_death_file;
 
 #define DIE(MSG) do { ets_printf("Crashed in file " __FILE__ " line %d: " MSG "\n", __LINE__); assert(0); abort(); } while(0)
 
-#elif defined(ESP_NONOS) || defined(ARDUINO)
+#elif defined(ARDUINO)
 
 #include <stdio.h>
 #include <assert.h>
@@ -216,7 +209,7 @@ extern const char* g_death_file;
 
 #if defined(ARDUINO_ARCH_ESP32)
 #include <esp8266-compat.h>
-#elif !defined(ESP_NONOS)
+#else
 /// Declares (on the ESP8266) that the current function is not executed too
 /// often and should be placed in the SPI flash.
 #define ICACHE_FLASH_ATTR
