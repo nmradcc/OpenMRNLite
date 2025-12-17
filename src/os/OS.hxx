@@ -733,7 +733,7 @@ private:
     /** handle to event object */
     EventGroupHandle_t event;
 };
-#elif defined(ARDUINO) && !defined(ESP_PLATFORM)
+#elif defined(ARDUINO)
 
 typedef uint32_t OSEventType;
 
@@ -767,6 +767,6 @@ extern uint32_t SystemCoreClock;
 
 #define configKERNEL_INTERRUPT_PRIORITY (0xa0)
 
-#endif  // freertos or arduino/esp32
+#endif  // freertos or arduino
 
 #endif /* _OS_OS_HXX_ */

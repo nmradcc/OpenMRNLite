@@ -37,8 +37,6 @@
 #include <stdint.h>
 #ifdef __FreeRTOS__
 #include "freertos/stropts.h"
-#elif defined(ESP_PLATFORM)
-#include "stropts.h"
 #endif
 
 #if defined (__cplusplus)

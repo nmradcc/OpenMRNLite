@@ -48,18 +48,10 @@ template <class Data> class FdHubWriteFlow;
 class FdHubPortBase : public FdHubPortInterface, private Atomic
 {
 public:
-#ifdef ESP_PLATFORM
-    // TODO: shrink these if possible
-    /// How many bytes of stack should we allocate to the write thread's stack.
-    static const int kWriteThreadStackSize = 2048;
-    /// How many bytes of stack should we allocate to the read thread's stack.
-    static const int kReadThreadStackSize = 2048;
-#else
     /// How many bytes of stack should we allocate to the write thread's stack.
     static const int kWriteThreadStackSize = 1000;
     /// How many bytes of stack should we allocate to the read thread's stack.
     static const int kReadThreadStackSize = 1000;
-#endif // ESP_PLATFORM
 
     /// Constructor.
     /// @param fd is the filedes to read/write

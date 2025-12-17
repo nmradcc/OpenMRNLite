@@ -42,11 +42,8 @@
 
 #include <memory>
 #include <netdb.h>
-#ifndef ESP_PLATFORM
-// these don't exist on the ESP32 with LWiP
 #include <netinet/in.h>
 #include <netinet/tcp.h>
-#endif // ESP_PLATFORM
 #include <sys/socket.h>
 #include <sys/types.h>
 #include <unistd.h>
@@ -57,11 +54,6 @@
 #include "utils/format_utils.hxx"
 #include "utils/macros.h"
 #include "utils/logging.h"
-
-#ifdef ESP_PLATFORM
-// this is not declared in netdb.h on ESP32
-const char *gai_strerror (int __ecode);
-#endif // ESP_PLATFORM
 
 int ConnectSocket(const char *host, int port)
 {

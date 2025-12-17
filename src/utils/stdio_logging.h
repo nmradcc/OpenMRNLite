@@ -6,11 +6,7 @@
 extern "C" {
 #endif
 
-#if defined(ESP_PLATFORM)
-#define LOGWEAK __attribute__((weak))
-#else
 #define LOGWEAK
-#endif
 
 LOGWEAK void log_output(char* buf, int size) {
     if (size <= 0) return;

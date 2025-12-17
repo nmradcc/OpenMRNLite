@@ -719,7 +719,7 @@ int ignore_fn(void)
     return 0;
 }
 
-#if !defined(ARDUINO) && !defined(ESP_PLATFORM)
+#if !defined(ARDUINO)
 
 int main(int argc, char *argv[]) __attribute__ ((weak));
 
@@ -771,7 +771,7 @@ int main(int argc, char *argv[])
 #endif
 }
 
-#endif // ESP_PLATFORM
+#endif // ARDUINO
 
 #if defined(ARDUINO)
 unsigned critical_nesting;

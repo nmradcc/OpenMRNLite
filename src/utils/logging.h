@@ -123,12 +123,8 @@ extern os_mutex_t g_log_mutex;
 /// Shorthand for LOG(LEVEL_ERROR, message...). See @ref LOG.
 #define LOG_ERROR(message...) LOG(LEVEL_ERROR, message)
 
-#if defined(ESP_PLATFORM)
-extern char logbuffer[1024];
-#else
 /// Temporary buffer to sprintf() the log lines into.
 extern char logbuffer[256];
-#endif
 
 #ifndef LOGLEVEL
 #ifdef __FreeRTOS__

@@ -43,30 +43,7 @@ OpenMRN::OpenMRN(openlcb::NodeID node_id)
     init(node_id);
 }
 
-#ifdef ESP_PLATFORM
-extern "C" {
-
-#ifndef OPENMRN_EXCLUDE_REBOOT_IMPL
-/// Reboots the ESP32 via the arduino-esp32 provided restart function.
-void reboot()
-{
-    ESP.restart();
-}
-#endif // OPENMRN_EXCLUDE_REBOOT_IMPL
-
-#ifndef OPENMRN_EXCLUDE_FREE_HEAP_IMPL
-ssize_t os_get_free_heap()
-{
-    return ESP.getFreeHeap();
-}
-#endif // OPENMRN_EXCLUDE_FREE_HEAP_IMPL
-
-}
-#endif // ESP_PLATFORM
-
 } // namespace openmrn_arduino
-
-#ifdef ESP_PLATFORM
 
 #include "lwip/ip_addr.h"
 #include "lwip/err.h"

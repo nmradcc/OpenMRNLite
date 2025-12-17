@@ -71,7 +71,7 @@ public:
     }
 };
 
-#elif defined(ESP_PLATFORM)
+#elif defined(__FreeRTOS__)
 
 #include "freertos_includes.h"
 
