@@ -56,6 +56,10 @@
 #include <semaphore.h>
 #endif
 
+#if defined(OPENMRN_FEATURE_RTOS_THREADX) || defined(OPENMRN_FEATURE_RTOS_CMSIS_V2)
+#include "rtos_includes.h"
+#endif
+
 #include "utils/macros.h"
 
 #ifdef __cplusplus
@@ -102,8 +106,33 @@ typedef struct
     unsigned char state; /**< keep track if already executed */
 } os_thread_once_t; /**< one time initialization type */
 typedef xSemaphoreHandle os_sem_t; /**< semaphore handle */
-#endif
-#if OPENMRN_FEATURE_MUTEX_FAKE
+#elif defined(OPENMRN_FEATURE_RTOS_THREADX)
+typedef TX_THREAD* os_thread_t; /**< thread handle */
+typedef struct
+{
+    TX_MUTEX mutex; /**< ThreadX mutex handle */
+    char recursive; /**< ThreadX mutexes are inherently recursive */
+} os_mutex_t; /**< mutex handle */
+typedef TX_QUEUE* os_mq_t; /**< message queue handle */
+typedef struct
+{
+    unsigned char state; /**< keep track if already executed */
+} os_thread_once_t; /**< one time initialization type */
+typedef TX_SEMAPHORE* os_sem_t; /**< semaphore handle */
+#elif defined(OPENMRN_FEATURE_RTOS_CMSIS_V2)
+typedef osThreadId_t os_thread_t; /**< thread handle */
+typedef struct
+{
+    osMutexId_t mutex; /**< CMSIS-RTOS v2 mutex handle */
+    char recursive; /**< recursive mutex marker */
+} os_mutex_t; /**< mutex handle */
+typedef osMessageQueueId_t os_mq_t; /**< message queue handle */
+typedef struct
+{
+    unsigned char state; /**< keep track if already executed */
+} os_thread_once_t; /**< one time initialization type */
+typedef osSemaphoreId_t os_sem_t; /**< semaphore handle */
+#elif OPENMRN_FEATURE_MUTEX_FAKE
 typedef struct {
     int locked;
     uint8_t recursive;
