@@ -61,7 +61,7 @@ LocalTrackIf::LocalTrackIf(Service *service, int pool_size)
 {
 }
 
-#if defined(OPENMRN_FEATURE_FD_CAN_DEVICE) || defined(GTEST)
+#if defined(OPENMRN_FEATURE_FD_CAN_DEVICE)
 StateFlowBase::Action LocalTrackIf::entry()
 {
     HASSERT(fd_ >= 0);
@@ -69,9 +69,7 @@ StateFlowBase::Action LocalTrackIf::entry()
     int ret = write(fd_, p, sizeof(*p));
     if (ret < 0) {
         HASSERT(errno == ENOSPC);
-        #ifndef GTEST
         ::ioctl(fd_, CAN_IOC_WRITE_ACTIVE, this);
-        #endif
         return wait();
     }
     return finish();

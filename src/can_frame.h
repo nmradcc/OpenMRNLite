@@ -34,57 +34,53 @@
 #ifndef _nmranet_can_h_
 #define _nmranet_can_h_
 
-#if defined (__FreeRTOS__) || \
-      defined (ARDUINO) || defined (ESP_PLATFORM)
-    #include <stdint.h>
+#include <stdint.h>
 
-    struct can_frame
+
+struct can_frame
+{
+    union
     {
-        union
+        uint32_t raw[4];
+        struct
         {
-            uint32_t raw[4];
-            struct
+            uint32_t can_id;      /**< 11- or 29-bit ID (3-bits unsed) */
+
+            uint8_t  can_dlc : 4; /**< 4-bit DLC */
+            uint8_t  can_rtr : 1; /**< RTR indication */
+            uint8_t  can_eff : 1; /**< Extended ID indication */
+            uint8_t  can_err : 1; /**< @todo not supported by nuttx */
+            uint8_t  can_res : 1; /**< Unused */
+
+            uint8_t  pad;  /**< padding */
+            uint8_t  res0; /**< reserved */
+            uint8_t  res1; /**< reserved */
+
+            union
             {
-                uint32_t can_id;      /**< 11- or 29-bit ID (3-bits unsed) */
-
-                uint8_t  can_dlc : 4; /**< 4-bit DLC */
-                uint8_t  can_rtr : 1; /**< RTR indication */
-                uint8_t  can_eff : 1; /**< Extended ID indication */
-                uint8_t  can_err : 1; /**< @todo not supported by nuttx */
-                uint8_t  can_res : 1; /**< Unused */
-
-                uint8_t  pad;  /**< padding */
-                uint8_t  res0; /**< reserved */
-                uint8_t  res1; /**< reserved */
-
-                union
-                {
-                    /** CAN message data (64-bit) */
-                    uint64_t data64 __attribute__((aligned(8)));
-                    /** CAN message data (0-8 byte) */
-                    uint8_t  data[8] __attribute__((aligned(8)));
-                };
+                /** CAN message data (64-bit) */
+                uint64_t data64 __attribute__((aligned(8)));
+                /** CAN message data (0-8 byte) */
+                uint8_t  data[8] __attribute__((aligned(8)));
             };
         };
     };
+};
 
-    #define SET_CAN_FRAME_EFF(_frame) (_frame).can_eff = 1
-    #define SET_CAN_FRAME_RTR(_frame) (_frame).can_rtr = 1
-    #define SET_CAN_FRAME_ERR(_frame) (_frame).can_err = 1
-    #define CLR_CAN_FRAME_EFF(_frame) (_frame).can_eff = 0
-    #define CLR_CAN_FRAME_RTR(_frame) (_frame).can_rtr = 0
-    #define CLR_CAN_FRAME_ERR(_frame) (_frame).can_err = 0
-    #define IS_CAN_FRAME_EFF(_frame) ((_frame).can_eff)
-    #define IS_CAN_FRAME_RTR(_frame) ((_frame).can_rtr)
-    #define IS_CAN_FRAME_ERR(_frame) ((0))
+#define SET_CAN_FRAME_EFF(_frame) (_frame).can_eff = 1
+#define SET_CAN_FRAME_RTR(_frame) (_frame).can_rtr = 1
+#define SET_CAN_FRAME_ERR(_frame) (_frame).can_err = 1
+#define CLR_CAN_FRAME_EFF(_frame) (_frame).can_eff = 0
+#define CLR_CAN_FRAME_RTR(_frame) (_frame).can_rtr = 0
+#define CLR_CAN_FRAME_ERR(_frame) (_frame).can_err = 0
+#define IS_CAN_FRAME_EFF(_frame) ((_frame).can_eff)
+#define IS_CAN_FRAME_RTR(_frame) ((_frame).can_rtr)
+#define IS_CAN_FRAME_ERR(_frame) ((0))
 
-    #define GET_CAN_FRAME_ID_EFF(_frame)  (_frame).can_id
-    #define GET_CAN_FRAME_ID(_frame)      (_frame).can_id
-    #define SET_CAN_FRAME_ID_EFF(_frame, _value)  (_frame).can_id = ((_value) & 0x1FFFFFFFU)
-    #define SET_CAN_FRAME_ID(_frame, _value)     (_frame).can_id = ((_value) & 0x7ffU)
+#define GET_CAN_FRAME_ID_EFF(_frame)  (_frame).can_id
+#define GET_CAN_FRAME_ID(_frame)      (_frame).can_id
+#define SET_CAN_FRAME_ID_EFF(_frame, _value)  (_frame).can_id = ((_value) & 0x1FFFFFFFU)
+#define SET_CAN_FRAME_ID(_frame, _value)     (_frame).can_id = ((_value) & 0x7ffU)
 
-#else
-#error No CAN frame representation for your OS
-#endif
 
 #endif /* _nmranet_can_h_ */

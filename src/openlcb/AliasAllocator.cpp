@@ -361,14 +361,6 @@ void AliasAllocator::ConflictHandler::send(Buffer<CanMessageData> *message,
     message->unref();
 }
 
-#ifdef GTEST
-
-void AliasAllocator::TEST_finish_pending_allocation() {
-    if (is_state(STATE(wait_done))) {
-        timer_.trigger();
-    }
-}
-
 void AliasAllocator::TEST_add_allocated_alias(NodeAlias alias)
 {
     add_allocated_alias(alias);

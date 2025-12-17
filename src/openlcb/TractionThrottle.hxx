@@ -190,15 +190,6 @@ public:
         updateCallback_ = std::move(update_callback);
     }
 
-#ifdef GTEST
-    void TEST_assign_listening_node(openlcb::NodeID dst)
-    {
-        dst_ = dst;
-        set_assigned();
-        set_listening();
-    }
-#endif
-
 private:
     Action entry() override
     {

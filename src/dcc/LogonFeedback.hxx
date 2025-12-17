@@ -152,9 +152,7 @@ public:
         }
     }
 
-#ifndef GTEST
 private:
-#endif
     enum Errors
     {
         /// Which bit offset do the error bits start.

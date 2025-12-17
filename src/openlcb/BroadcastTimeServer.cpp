@@ -296,9 +296,6 @@ public:
         , writer_()
         , timer_(this)
         , syncRequired_(false)
-#if defined(GTEST)
-        , shutdown_(false)
-#endif
     {
     }
 
@@ -322,13 +319,6 @@ public:
         }
     }
 
-#if defined(GTEST)
-    void shutdown()
-    {
-        shutdown_ = true;
-        request_sync();
-    }
-
     bool is_shutdown()
     {
         return is_terminated();
@@ -341,12 +331,6 @@ private:
     /// @return wait_and_call(STATE(send_rate_report))
     Action entry() override
     {
-#if defined(GTEST)
-        if (shutdown_)
-        {
-            return StateFlowBase::exit();
-        }
-#endif
         server_->gmtime_recalculate();
 
         uint64_t event_id = server_->event_base();
@@ -477,9 +461,6 @@ private:
     WriteHelper writer_; ///< helper for sending event messages
     StateFlowTimer timer_; ///< timer helper
     uint8_t syncRequired_ : 1; ///< flag to keep track of multiple sync requests
-#if defined(GTEST)
-    uint8_t shutdown_ : 1;
-#endif
 
     DISALLOW_COPY_AND_ASSIGN(BroadcastTimeServerSync);
 };
@@ -804,9 +785,6 @@ BroadcastTimeServer::BroadcastTimeServer(Node *node, NodeID clock_id)
     : BroadcastTime(node, clock_id)
     , secondsRequested_(0)
     , updateRequested_(false)
-#if defined (GTEST)
-    , shutdown_(false)
-#endif
     , time_(new BroadcastTimeServerTime(this))
     , sync_(new BroadcastTimeServerSync(this))
     , set_(new BroadcastTimeServerSet(this))
@@ -826,14 +804,6 @@ BroadcastTimeServer::~BroadcastTimeServer()
     delete set_;
     delete sync_;
     delete time_;
-}
-
-#if defined(GTEST)
-void BroadcastTimeServer::shutdown()
-{
-    shutdown_ = true;
-    sync_->shutdown();
-    alarm_->shutdown();
 }
 
 bool BroadcastTimeServer::is_shutdown()

@@ -172,7 +172,6 @@ public:
         }
     }
 
-#ifdef GTEST
     /// Requests to exit any timed operation.
     /// @return true if a timer was woken up.
     bool shutdown()
