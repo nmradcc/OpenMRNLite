@@ -40,7 +40,7 @@
 #define ESP_IDF_VERSION 0
 #define ESP_IDF_VERSION_VAL(a,b,c) 1
 
-#if defined(__FreeRTOS__) || defined(OPENMRN_FEATURE_RTOS_THREADX) || defined(OPENMRN_FEATURE_RTOS_CMSIS_V2)
+#if defined(__FreeRTOS__)
 /// Compiles the FreeRTOS event group based ::select() implementation.
 #define OPENMRN_FEATURE_DEVICE_SELECT 1
 /// Adds implementations for ::read ::write etc, with fd table.
@@ -50,7 +50,10 @@
 #define OPENMRN_FEATURE_REENT 1
 #endif
 
-#if defined(__FreeRTOS__) || defined(OPENMRN_FEATURE_RTOS_THREADX) || defined(OPENMRN_FEATURE_RTOS_CMSIS_V2)
+// ThreadX and CMSIS-RTOS v2 support is minimal for now
+// TODO: Implement DEVTAB, REENT, and other features for ThreadX/CMSIS-RTOS v2
+
+#if defined(__FreeRTOS__)
 // Note: this is not using OPENMRN_FEATURE_DEVICE_SELECT due to other usages
 // of that macro.
 /// Adds support for FD based CAN interfaces.
@@ -81,12 +84,16 @@
 #define OPENMRN_FEATURE_SINGLE_THREADED 1
 #endif
 
-#if defined(__FreeRTOS__) || defined(OPENMRN_FEATURE_RTOS_THREADX) || defined(OPENMRN_FEATURE_RTOS_CMSIS_V2)
+#if defined(__FreeRTOS__)
 /// Use os_mutex_... implementation based on FreeRTOS mutex and semaphores.
 #define OPENMRN_FEATURE_MUTEX_FREERTOS 1
 
 /// Enables use of Notifiable::notify_from_isr and OSSem::post_from_isr.
 #define OPENMRN_FEATURE_RTOS_FROM_ISR 1
+#elif defined(OPENMRN_FEATURE_RTOS_THREADX) || defined(OPENMRN_FEATURE_RTOS_CMSIS_V2)
+/// Add a fake implementation for os_mutex_lock that crashes if there is a conflict.
+/// TODO: Implement proper ThreadX/CMSIS-RTOS v2 mutex support
+#define OPENMRN_FEATURE_MUTEX_FAKE 1
 #elif OPENMRN_FEATURE_SINGLE_THREADED
 /// Add a fake implementation for os_mutex_lock that crashes if there is a
 /// conflict.

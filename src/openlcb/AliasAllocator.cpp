@@ -366,6 +366,4 @@ void AliasAllocator::TEST_add_allocated_alias(NodeAlias alias)
     add_allocated_alias(alias);
 }
 
-#endif
-
 } // namespace openlcb

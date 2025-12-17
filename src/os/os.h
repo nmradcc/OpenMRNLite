@@ -106,33 +106,9 @@ typedef struct
     unsigned char state; /**< keep track if already executed */
 } os_thread_once_t; /**< one time initialization type */
 typedef xSemaphoreHandle os_sem_t; /**< semaphore handle */
-#elif defined(OPENMRN_FEATURE_RTOS_THREADX)
-typedef TX_THREAD* os_thread_t; /**< thread handle */
-typedef struct
-{
-    TX_MUTEX mutex; /**< ThreadX mutex handle */
-    char recursive; /**< ThreadX mutexes are inherently recursive */
-} os_mutex_t; /**< mutex handle */
-typedef TX_QUEUE* os_mq_t; /**< message queue handle */
-typedef struct
-{
-    unsigned char state; /**< keep track if already executed */
-} os_thread_once_t; /**< one time initialization type */
-typedef TX_SEMAPHORE* os_sem_t; /**< semaphore handle */
-#elif defined(OPENMRN_FEATURE_RTOS_CMSIS_V2)
-typedef osThreadId_t os_thread_t; /**< thread handle */
-typedef struct
-{
-    osMutexId_t mutex; /**< CMSIS-RTOS v2 mutex handle */
-    char recursive; /**< recursive mutex marker */
-} os_mutex_t; /**< mutex handle */
-typedef osMessageQueueId_t os_mq_t; /**< message queue handle */
-typedef struct
-{
-    unsigned char state; /**< keep track if already executed */
-} os_thread_once_t; /**< one time initialization type */
-typedef osSemaphoreId_t os_sem_t; /**< semaphore handle */
 #elif OPENMRN_FEATURE_MUTEX_FAKE
+// Used for single-threaded environments, Arduino, and currently also ThreadX/CMSIS-RTOS v2
+// TODO: Implement proper ThreadX and CMSIS-RTOS v2 support
 typedef struct {
     int locked;
     uint8_t recursive;
@@ -391,7 +367,7 @@ OS_INLINE os_thread_t os_thread_self(void)
 {
 #if OPENMRN_FEATURE_MUTEX_FREERTOS
     return xTaskGetCurrentTaskHandle();
-#elif OPENMRN_FEATURE_SINGLE_THREADED
+#elif OPENMRN_FEATURE_MUTEX_FAKE || OPENMRN_FEATURE_SINGLE_THREADED
     return 0xdeadbeef;
 #elif OPENMRN_FEATURE_MUTEX_PTHREAD
     return pthread_self();
@@ -406,7 +382,7 @@ OS_INLINE int os_thread_get_priority(os_thread_t thread)
 {
 #if OPENMRN_FEATURE_MUTEX_FREERTOS
     return uxTaskPriorityGet(thread);
-#elif OPENMRN_FEATURE_SINGLE_THREADED
+#elif OPENMRN_FEATURE_MUTEX_FAKE || OPENMRN_FEATURE_SINGLE_THREADED
     return 2;
 #elif OPENMRN_FEATURE_MUTEX_PTHREAD
     struct sched_param params;
@@ -423,7 +399,7 @@ OS_INLINE int os_thread_get_priority_min(void)
 {
 #if OPENMRN_FEATURE_MUTEX_FREERTOS
     return 1;
-#elif OPENMRN_FEATURE_SINGLE_THREADED
+#elif OPENMRN_FEATURE_MUTEX_FAKE || OPENMRN_FEATURE_SINGLE_THREADED
     return 2;
 #elif OPENMRN_FEATURE_MUTEX_PTHREAD
     return sched_get_priority_min(SCHED_FIFO);
@@ -437,7 +413,7 @@ OS_INLINE int os_thread_get_priority_max(void)
 {
 #if OPENMRN_FEATURE_MUTEX_FREERTOS
     return configMAX_PRIORITIES - 1;
-#elif OPENMRN_FEATURE_SINGLE_THREADED
+#elif OPENMRN_FEATURE_MUTEX_FAKE || OPENMRN_FEATURE_SINGLE_THREADED
     return 2;
 #elif OPENMRN_FEATURE_MUTEX_PTHREAD
     return sched_get_priority_max(SCHED_FIFO);

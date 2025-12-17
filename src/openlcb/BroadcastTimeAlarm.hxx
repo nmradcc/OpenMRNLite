@@ -123,7 +123,6 @@ public:
     {
         return is_terminated();
     }
-#endif
 
 protected:
     /// Entry point to state flow.

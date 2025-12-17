@@ -323,7 +323,6 @@ public:
     {
         return is_terminated();
     }
-#endif
 
 private:
     /// Send the Producer Identified message appropriate for the start/stop
@@ -810,7 +809,6 @@ bool BroadcastTimeServer::is_shutdown()
 {
     return is_terminated() && alarm_->is_shutdown() && sync_->is_shutdown();
 }
-#endif
 
 //
 // BroadcastTimeServer::handle_consumer_identified()

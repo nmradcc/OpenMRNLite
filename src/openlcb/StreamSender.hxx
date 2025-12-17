@@ -184,7 +184,6 @@ public:
         }
         return false;
     }
-#endif
 
     /// @return the state of this stream sender.
     StreamSenderState get_state()

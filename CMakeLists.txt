@@ -44,18 +44,29 @@ file(GLOB_RECURSE OPENMRNLITE_SOURCES
     src/executor/*.cpp
     src/openlcb/*.cpp
     src/utils/*.cpp
-    src/freertos_drivers/common/*.cpp
-    src/freertos_drivers/arduino/*.cpp
-    src/freertos_drivers/sam/*.cpp
-    src/freertos_drivers/stm32/*.cpp
     src/OpenMRNLite.cpp
 )
 
+# Add platform-specific drivers only for FreeRTOS (they depend on FreeRTOS features)
+if(OPENMRN_RTOS STREQUAL "FreeRTOS")
+    file(GLOB_RECURSE FREERTOS_DRIVER_SOURCES
+        src/freertos_drivers/common/*.cpp
+        src/freertos_drivers/arduino/*.cpp
+        src/freertos_drivers/sam/*.cpp
+        src/freertos_drivers/stm32/*.cpp
+    )
+    list(APPEND OPENMRNLITE_SOURCES ${FREERTOS_DRIVER_SOURCES})
+endif()
+
 # Add OS layer sources based on RTOS selection
 if(OPENMRN_RTOS STREQUAL "ThreadX")
-    file(GLOB OS_SOURCES src/os/*.cpp src/os/threadx_impl.c)
+    # For now, ThreadX uses fake mutex/sem implementation, so don't include threadx_impl.c
+    # Also exclude MDNS.cpp and OSSelectWakeup.cpp which require full OS support
+    file(GLOB OS_SOURCES src/os/*.cpp)
+    list(FILTER OS_SOURCES EXCLUDE REGEX ".*/(MDNS|OSSelectWakeup|OS)\\.cpp$")
 elseif(OPENMRN_RTOS STREQUAL "CMSIS_RTOS_V2")
     file(GLOB OS_SOURCES src/os/*.cpp src/os/cmsis_rtos2_impl.c)
+    list(FILTER OS_SOURCES EXCLUDE REGEX ".*/(MDNS|OSSelectWakeup|OS)\\.cpp$")
 else() # FreeRTOS (default)
     file(GLOB OS_SOURCES src/os/*.cpp)
 endif()
@@ -105,12 +116,44 @@ if(OPENMRN_RTOS STREQUAL "ThreadX")
         USING_THREADX=1
     )
     message(STATUS "RTOS: ThreadX")
+    
+    # Link to stm32cubemx target if it exists (provides ThreadX headers)
+    if(TARGET stm32cubemx)
+        # Get include directories from stm32cubemx without creating a link dependency
+        get_target_property(STM32CUBEMX_INCLUDES stm32cubemx INTERFACE_INCLUDE_DIRECTORIES)
+        if(STM32CUBEMX_INCLUDES)
+            target_include_directories(OpenMRNLite PRIVATE ${STM32CUBEMX_INCLUDES})
+            message(STATUS "  Using stm32cubemx includes for ThreadX")
+        endif()
+        
+        # Get compile definitions from stm32cubemx
+        get_target_property(STM32CUBEMX_DEFINES stm32cubemx INTERFACE_COMPILE_DEFINITIONS)
+        if(STM32CUBEMX_DEFINES)
+            target_compile_definitions(OpenMRNLite PRIVATE ${STM32CUBEMX_DEFINES})
+        endif()
+    endif()
 elseif(OPENMRN_RTOS STREQUAL "CMSIS_RTOS_V2")
     target_compile_definitions(OpenMRNLite PUBLIC
         OPENMRN_FEATURE_RTOS_CMSIS_V2=1
         USING_CMSIS_RTOS_V2=1
     )
     message(STATUS "RTOS: CMSIS-RTOS v2")
+    
+    # Link to stm32cubemx target if it exists (provides CMSIS-RTOS v2 headers)
+    if(TARGET stm32cubemx)
+        # Get include directories from stm32cubemx without creating a link dependency
+        get_target_property(STM32CUBEMX_INCLUDES stm32cubemx INTERFACE_INCLUDE_DIRECTORIES)
+        if(STM32CUBEMX_INCLUDES)
+            target_include_directories(OpenMRNLite PRIVATE ${STM32CUBEMX_INCLUDES})
+            message(STATUS "  Using stm32cubemx includes for CMSIS-RTOS v2")
+        endif()
+        
+        # Get compile definitions from stm32cubemx
+        get_target_property(STM32CUBEMX_DEFINES stm32cubemx INTERFACE_COMPILE_DEFINITIONS)
+        if(STM32CUBEMX_DEFINES)
+            target_compile_definitions(OpenMRNLite PRIVATE ${STM32CUBEMX_DEFINES})
+        endif()
+    endif()
 else() # FreeRTOS (default)
     target_compile_definitions(OpenMRNLite PUBLIC
         OPENMRN_FEATURE_RTOS_FREERTOS=1
