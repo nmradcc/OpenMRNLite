@@ -48,7 +48,7 @@
 #elif defined(OPENMRN_FEATURE_RTOS_THREADX) || defined(TX_THREAD_H)
     #define USING_THREADX 1
     #include "tx_api.h"
-    // ThreadX tick conversion (assuming 100Hz tick rate, adjust as needed)
+    // ThreadX tick conversion (assuming 1000Hz = 1ms tick rate)
     #define NSEC_TO_TICK(ns) (((ns) * TX_TIMER_TICKS_PER_SECOND) / 1000000000ULL)
 
 #elif defined(OPENMRN_FEATURE_RTOS_CMSIS_V2)
