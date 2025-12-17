@@ -106,9 +106,40 @@ typedef struct
     unsigned char state; /**< keep track if already executed */
 } os_thread_once_t; /**< one time initialization type */
 typedef xSemaphoreHandle os_sem_t; /**< semaphore handle */
+#elif defined(OPENMRN_FEATURE_RTOS_THREADX)
+typedef TX_THREAD* os_thread_t; /**< thread handle */
+typedef struct
+{
+    TX_MUTEX mutex; /**< ThreadX mutex handle */
+    char recursive; /**< ThreadX mutexes are inherently recursive */
+} os_mutex_t; /**< mutex handle */
+typedef struct
+{
+    TX_SEMAPHORE sem; /**< ThreadX semaphore handle */
+} os_sem_t; /**< semaphore handle */
+typedef TX_QUEUE* os_mq_t; /**< message queue handle */
+typedef struct
+{
+    unsigned char state; /**< keep track if already executed */
+} os_thread_once_t; /**< one time initialization type */
+#elif defined(OPENMRN_FEATURE_RTOS_CMSIS_V2)
+typedef osThreadId_t os_thread_t; /**< thread handle */
+typedef struct
+{
+    osMutexId_t mutex; /**< CMSIS-RTOS v2 mutex handle */
+    char recursive; /**< recursive mutex marker */
+} os_mutex_t; /**< mutex handle */
+typedef struct
+{
+    osSemaphoreId_t sem; /**< CMSIS-RTOS v2 semaphore handle */
+} os_sem_t; /**< semaphore handle */
+typedef osMessageQueueId_t os_mq_t; /**< message queue handle */
+typedef struct
+{
+    unsigned char state; /**< keep track if already executed */
+} os_thread_once_t; /**< one time initialization type */
 #elif OPENMRN_FEATURE_MUTEX_FAKE
-// Used for single-threaded environments, Arduino, and currently also ThreadX/CMSIS-RTOS v2
-// TODO: Implement proper ThreadX and CMSIS-RTOS v2 support
+// Used for single-threaded environments and Arduino
 typedef struct {
     int locked;
     uint8_t recursive;
@@ -367,6 +398,9 @@ OS_INLINE os_thread_t os_thread_self(void)
 {
 #if OPENMRN_FEATURE_MUTEX_FREERTOS
     return xTaskGetCurrentTaskHandle();
+#elif defined(OPENMRN_FEATURE_RTOS_THREADX)
+    extern os_thread_t os_thread_self_threadx(void);
+    return os_thread_self_threadx();
 #elif OPENMRN_FEATURE_MUTEX_FAKE || OPENMRN_FEATURE_SINGLE_THREADED
     return 0xdeadbeef;
 #elif OPENMRN_FEATURE_MUTEX_PTHREAD
@@ -382,6 +416,10 @@ OS_INLINE int os_thread_get_priority(os_thread_t thread)
 {
 #if OPENMRN_FEATURE_MUTEX_FREERTOS
     return uxTaskPriorityGet(thread);
+#elif defined(OPENMRN_FEATURE_RTOS_THREADX)
+    UINT priority;
+    UINT status = tx_thread_info_get(thread, NULL, NULL, NULL, &priority, NULL, NULL, NULL, NULL);
+    return (status == TX_SUCCESS) ? priority : 16;
 #elif OPENMRN_FEATURE_MUTEX_FAKE || OPENMRN_FEATURE_SINGLE_THREADED
     return 2;
 #elif OPENMRN_FEATURE_MUTEX_PTHREAD
@@ -399,6 +437,8 @@ OS_INLINE int os_thread_get_priority_min(void)
 {
 #if OPENMRN_FEATURE_MUTEX_FREERTOS
     return 1;
+#elif defined(OPENMRN_FEATURE_RTOS_THREADX)
+    return 0; // ThreadX priority 0 is highest
 #elif OPENMRN_FEATURE_MUTEX_FAKE || OPENMRN_FEATURE_SINGLE_THREADED
     return 2;
 #elif OPENMRN_FEATURE_MUTEX_PTHREAD
@@ -413,6 +453,8 @@ OS_INLINE int os_thread_get_priority_max(void)
 {
 #if OPENMRN_FEATURE_MUTEX_FREERTOS
     return configMAX_PRIORITIES - 1;
+#elif defined(OPENMRN_FEATURE_RTOS_THREADX)
+    return 31; // ThreadX priority 31 is lowest
 #elif OPENMRN_FEATURE_MUTEX_FAKE || OPENMRN_FEATURE_SINGLE_THREADED
     return 2;
 #elif OPENMRN_FEATURE_MUTEX_PTHREAD
@@ -425,6 +467,11 @@ OS_INLINE int os_thread_get_priority_max(void)
 #define OS_MUTEX_INITIALIZER {NULL, 0}
 /** Static initializer for recursive mutexes */
 #define OS_RECURSIVE_MUTEX_INITIALIZER {NULL, 1}
+#elif defined(OPENMRN_FEATURE_RTOS_THREADX)
+/** Static initializer for mutexes (ThreadX mutexes must be initialized at runtime) */
+#define OS_MUTEX_INITIALIZER {{0}, 0}
+/** Static initializer for recursive mutexes (ThreadX mutexes must be initialized at runtime) */
+#define OS_RECURSIVE_MUTEX_INITIALIZER {{0}, 1}
 #elif OPENMRN_FEATURE_MUTEX_FAKE
 /** Static initializer for mutexes */
 #define OS_MUTEX_INITIALIZER {0, 0}
@@ -449,6 +496,9 @@ OS_INLINE int os_mutex_init(os_mutex_t *mutex)
     mutex->sem = xSemaphoreCreateMutex();
 
     return 0;
+#elif defined(OPENMRN_FEATURE_RTOS_THREADX)
+    extern int os_mutex_init_threadx(os_mutex_t *mutex);
+    return os_mutex_init_threadx(mutex);
 #elif OPENMRN_FEATURE_MUTEX_FAKE
     mutex->locked = 0;
     mutex->recursive = 0;
@@ -469,6 +519,10 @@ OS_INLINE int os_recursive_mutex_init(os_mutex_t *mutex)
     mutex->sem = xSemaphoreCreateRecursiveMutex();
 
     return 0;
+#elif defined(OPENMRN_FEATURE_RTOS_THREADX)
+    // ThreadX mutexes are inherently recursive
+    extern int os_mutex_init_threadx(os_mutex_t *mutex);
+    return os_mutex_init_threadx(mutex);
 #elif OPENMRN_FEATURE_MUTEX_FAKE
     mutex->locked = 0;
     mutex->recursive = 1;
@@ -503,6 +557,9 @@ OS_INLINE int os_mutex_destroy(os_mutex_t *mutex)
     vSemaphoreDelete(mutex->sem);
 
     return 0;
+#elif defined(OPENMRN_FEATURE_RTOS_THREADX)
+    extern int os_mutex_destroy_threadx(os_mutex_t *mutex);
+    return os_mutex_destroy_threadx(mutex);
 #elif OPENMRN_FEATURE_MUTEX_FAKE
     mutex->locked = 0;
     return 0;
@@ -552,6 +609,9 @@ OS_INLINE int os_mutex_lock(os_mutex_t *mutex)
         xSemaphoreTake(mutex->sem, portMAX_DELAY);
     }
     return 0;
+#elif defined(OPENMRN_FEATURE_RTOS_THREADX)
+    extern int os_mutex_lock_threadx(os_mutex_t *mutex);
+    return os_mutex_lock_threadx(mutex);
 #elif OPENMRN_FEATURE_MUTEX_FAKE
     if (mutex->locked && !mutex->recursive)
     {
@@ -580,6 +640,9 @@ OS_INLINE int os_mutex_unlock(os_mutex_t *mutex)
         xSemaphoreGive(mutex->sem);
     }
     return 0;
+#elif defined(OPENMRN_FEATURE_RTOS_THREADX)
+    extern int os_mutex_unlock_threadx(os_mutex_t *mutex);
+    return os_mutex_unlock_threadx(mutex);
 #elif OPENMRN_FEATURE_MUTEX_FAKE
     if (mutex->locked <= 0)
     {
@@ -605,6 +668,9 @@ OS_INLINE int os_sem_init(os_sem_t *sem, unsigned int value)
       abort();
     }
     return 0;
+#elif defined(OPENMRN_FEATURE_RTOS_THREADX)
+    extern int os_sem_init_threadx(os_sem_t *sem, unsigned int value);
+    return os_sem_init_threadx(sem, value);
 #elif OPENMRN_FEATURE_MUTEX_FAKE
     sem->counter = value;
     return 0;
@@ -625,6 +691,9 @@ OS_INLINE int os_sem_destroy(os_sem_t *sem)
 #if OPENMRN_FEATURE_MUTEX_FREERTOS
     vSemaphoreDelete(*sem);
     return 0;
+#elif defined(OPENMRN_FEATURE_RTOS_THREADX)
+    UINT status = tx_semaphore_delete(&sem->sem);
+    return (status == TX_SUCCESS) ? 0 : -1;
 #elif OPENMRN_FEATURE_MUTEX_FAKE
     return 0;
 #elif OPENMRN_FEATURE_MUTEX_PTHREAD
@@ -643,6 +712,9 @@ OS_INLINE int os_sem_post(os_sem_t *sem)
 #if OPENMRN_FEATURE_MUTEX_FREERTOS
     xSemaphoreGive(*sem);
     return 0;
+#elif defined(OPENMRN_FEATURE_RTOS_THREADX)
+    extern int os_sem_post_threadx(os_sem_t *sem);
+    return os_sem_post_threadx(sem);
 #elif OPENMRN_FEATURE_MUTEX_FAKE
     sem->counter++;
     return 0;
@@ -663,10 +735,16 @@ OS_INLINE int os_sem_post(os_sem_t *sem)
  */
 OS_INLINE int os_sem_post_from_isr(os_sem_t *sem, int *woken)
 {
+#if OPENMRN_FEATURE_MUTEX_FREERTOS
     portBASE_TYPE local_woken = 0;
     xSemaphoreGiveFromISR(*sem, &local_woken);
     *woken |= local_woken;
     return 0;
+#elif defined(OPENMRN_FEATURE_RTOS_THREADX)
+    // ThreadX: semaphore post is safe from ISR context
+    extern int os_sem_post_threadx(os_sem_t *sem);
+    return os_sem_post_threadx(sem);
+#endif
 }
 #endif // OPENMRN_FEATURE_RTOS_FROM_ISR
 
@@ -679,6 +757,9 @@ OS_INLINE int os_sem_wait(os_sem_t *sem)
 #if OPENMRN_FEATURE_MUTEX_FREERTOS
     xSemaphoreTake(*sem, portMAX_DELAY);
     return 0;
+#elif defined(OPENMRN_FEATURE_RTOS_THREADX)
+    extern int os_sem_wait_threadx(os_sem_t *sem);
+    return os_sem_wait_threadx(sem);
 #elif OPENMRN_FEATURE_MUTEX_FAKE
     if (!sem->counter) {
         DIE("Semaphore deadlock.");
@@ -719,6 +800,13 @@ OS_INLINE int os_sem_timedwait(os_sem_t *sem, long long timeout)
         errno = ETIMEDOUT;
         return -1;
     }
+#elif defined(OPENMRN_FEATURE_RTOS_THREADX)
+    extern int os_sem_timedwait_threadx(os_sem_t *sem, long long timeout);
+    int result = os_sem_timedwait_threadx(sem, timeout);
+    if (result != 0) {
+        errno = ETIMEDOUT;
+    }
+    return result;
 #elif OPENMRN_FEATURE_MUTEX_PTHREAD
     struct timeval tv;
     struct timespec ts;
@@ -770,6 +858,10 @@ OS_INLINE os_mq_t os_mq_create(size_t length, size_t item_size)
 {
 #if OPENMRN_FEATURE_MUTEX_FREERTOS
     return xQueueCreate(length, item_size);
+#elif defined(OPENMRN_FEATURE_RTOS_THREADX)
+    // ThreadX queues need to be created with actual implementation
+    extern TX_QUEUE* os_mq_create_threadx(size_t length, size_t item_size);
+    return os_mq_create_threadx(length, item_size);
 #else
     QueuePriv *q = (QueuePriv*)malloc(sizeof(QueuePriv));
     if (!q)

@@ -60,9 +60,9 @@ endif()
 
 # Add OS layer sources based on RTOS selection
 if(OPENMRN_RTOS STREQUAL "ThreadX")
-    # For now, ThreadX uses fake mutex/sem implementation, so don't include threadx_impl.c
-    # Also exclude MDNS.cpp and OSSelectWakeup.cpp which require full OS support
-    file(GLOB OS_SOURCES src/os/*.cpp)
+    # Include ThreadX-specific implementation
+    file(GLOB OS_SOURCES src/os/*.cpp src/os/threadx_impl.c)
+    # Exclude MDNS.cpp and OSSelectWakeup.cpp which require full select() support
     list(FILTER OS_SOURCES EXCLUDE REGEX ".*/(MDNS|OSSelectWakeup|OS)\\.cpp$")
 elseif(OPENMRN_RTOS STREQUAL "CMSIS_RTOS_V2")
     file(GLOB OS_SOURCES src/os/*.cpp src/os/cmsis_rtos2_impl.c)

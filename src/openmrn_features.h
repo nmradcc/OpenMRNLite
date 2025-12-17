@@ -90,10 +90,24 @@
 
 /// Enables use of Notifiable::notify_from_isr and OSSem::post_from_isr.
 #define OPENMRN_FEATURE_RTOS_FROM_ISR 1
-#elif defined(OPENMRN_FEATURE_RTOS_THREADX) || defined(OPENMRN_FEATURE_RTOS_CMSIS_V2)
-/// Add a fake implementation for os_mutex_lock that crashes if there is a conflict.
-/// TODO: Implement proper ThreadX/CMSIS-RTOS v2 mutex support
-#define OPENMRN_FEATURE_MUTEX_FAKE 1
+#elif defined(OPENMRN_FEATURE_RTOS_THREADX)
+/// Use ThreadX native mutex and semaphore implementation.
+#define OPENMRN_FEATURE_MUTEX_THREADX 1
+
+/// Compile os_sem_timedwait functions.
+#define OPENMRN_FEATURE_SEM_TIMEDWAIT 1
+
+/// Enables use of Notifiable::notify_from_isr and OSSem::post_from_isr.
+#define OPENMRN_FEATURE_RTOS_FROM_ISR 1
+#elif defined(OPENMRN_FEATURE_RTOS_CMSIS_V2)
+/// Use CMSIS-RTOS v2 native mutex and semaphore implementation.
+#define OPENMRN_FEATURE_MUTEX_CMSIS_V2 1
+
+/// Compile os_sem_timedwait functions.
+#define OPENMRN_FEATURE_SEM_TIMEDWAIT 1
+
+/// Enables use of Notifiable::notify_from_isr and OSSem::post_from_isr.
+#define OPENMRN_FEATURE_RTOS_FROM_ISR 1
 #elif OPENMRN_FEATURE_SINGLE_THREADED
 /// Add a fake implementation for os_mutex_lock that crashes if there is a
 /// conflict.
