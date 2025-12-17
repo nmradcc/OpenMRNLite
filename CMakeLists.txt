@@ -12,6 +12,10 @@ set(CMAKE_C_STANDARD_REQUIRED ON)
 option(BUILD_EXAMPLES "Build example applications" OFF)
 option(BUILD_SHARED_LIBS "Build shared libraries" OFF)
 
+# RTOS Selection (only one should be enabled)
+set(OPENMRN_RTOS "FreeRTOS" CACHE STRING "Select RTOS: FreeRTOS, ThreadX, or CMSIS_RTOS_V2")
+set_property(CACHE OPENMRN_RTOS PROPERTY STRINGS "FreeRTOS" "ThreadX" "CMSIS_RTOS_V2")
+
 # Set default build type if not specified
 if(NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE Release CACHE STRING "Choose the type of build." FORCE)
@@ -39,7 +43,6 @@ file(GLOB_RECURSE OPENMRNLITE_SOURCES
     src/dcc/*.cpp
     src/executor/*.cpp
     src/openlcb/*.cpp
-    src/os/*.cpp
     src/utils/*.cpp
     src/freertos_drivers/common/*.cpp
     src/freertos_drivers/arduino/*.cpp
@@ -47,6 +50,17 @@ file(GLOB_RECURSE OPENMRNLITE_SOURCES
     src/freertos_drivers/stm32/*.cpp
     src/OpenMRNLite.cpp
 )
+
+# Add OS layer sources based on RTOS selection
+if(OPENMRN_RTOS STREQUAL "ThreadX")
+    file(GLOB OS_SOURCES src/os/*.cpp src/os/threadx_impl.c)
+elseif(OPENMRN_RTOS STREQUAL "CMSIS_RTOS_V2")
+    file(GLOB OS_SOURCES src/os/*.cpp src/os/cmsis_rtos2_impl.c)
+else() # FreeRTOS (default)
+    file(GLOB OS_SOURCES src/os/*.cpp)
+endif()
+
+list(APPEND OPENMRNLITE_SOURCES ${OS_SOURCES})
 
 # Collect all header files
 file(GLOB_RECURSE OPENMRNLITE_HEADERS
@@ -83,6 +97,27 @@ endif()
 target_compile_definitions(OpenMRNLite PUBLIC
     $<$<CONFIG:Debug>:DEBUG>
 )
+
+# Add RTOS-specific definitions
+if(OPENMRN_RTOS STREQUAL "ThreadX")
+    target_compile_definitions(OpenMRNLite PUBLIC
+        OPENMRN_FEATURE_RTOS_THREADX=1
+        USING_THREADX=1
+    )
+    message(STATUS "RTOS: ThreadX")
+elseif(OPENMRN_RTOS STREQUAL "CMSIS_RTOS_V2")
+    target_compile_definitions(OpenMRNLite PUBLIC
+        OPENMRN_FEATURE_RTOS_CMSIS_V2=1
+        USING_CMSIS_RTOS_V2=1
+    )
+    message(STATUS "RTOS: CMSIS-RTOS v2")
+else() # FreeRTOS (default)
+    target_compile_definitions(OpenMRNLite PUBLIC
+        OPENMRN_FEATURE_RTOS_FREERTOS=1
+        __FreeRTOS__=1
+    )
+    message(STATUS "RTOS: FreeRTOS (default)")
+endif()
 
 # Installation
 include(GNUInstallDirs)
@@ -139,6 +174,7 @@ message(STATUS "")
 message(STATUS "OpenMRNLite Configuration Summary:")
 message(STATUS "  Version:           ${PROJECT_VERSION}")
 message(STATUS "  Build type:        ${CMAKE_BUILD_TYPE}")
+message(STATUS "  RTOS:              ${OPENMRN_RTOS}")
 message(STATUS "  Target system:     ${CMAKE_SYSTEM_NAME}")
 message(STATUS "  Target processor:  ${CMAKE_SYSTEM_PROCESSOR}")
 message(STATUS "  Toolchain file:    ${CMAKE_TOOLCHAIN_FILE}")

@@ -38,10 +38,20 @@ You can customize the build using the following options:
 
 ```bash
 cmake .. -DCMAKE_TOOLCHAIN_FILE=toolchain.cmake  # REQUIRED: Specify toolchain
+cmake .. -DOPENMRN_RTOS=FreeRTOS                 # Select RTOS: FreeRTOS (default), ThreadX, or CMSIS_RTOS_V2
 cmake .. -DBUILD_EXAMPLES=ON                     # Build example applications (default: OFF)
 cmake .. -DBUILD_SHARED_LIBS=ON                  # Build shared libraries (default: OFF)
 cmake .. -DCMAKE_BUILD_TYPE=Debug                # Set build type: Debug, Release, etc.
 ```
+
+## RTOS Selection
+
+OpenMRNLite supports multiple RTOS options:
+- **FreeRTOS** (default) - Most widely used
+- **ThreadX** - Azure RTOS
+- **CMSIS-RTOS v2** - ARM standard API
+
+See [RTOS_SUPPORT.md](RTOS_SUPPORT.md) for detailed information about RTOS selection and configuration.
 
 ## Creating a Toolchain File
 

@@ -1,5 +1,5 @@
 /** \copyright
- * Copyright (c) 2019, Balazs Racz
+ * Copyright (c) 2025
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -24,13 +24,41 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  *
- * \file freertos_includes.h
- * This file provides backward compatibility by including the new unified
- * RTOS abstraction layer. New code should include rtos_includes.h directly.
+ * \file rtos_includes.h
+ * This file simplifies the include path for RTOS header files and provides
+ * unified abstractions for FreeRTOS, ThreadX, and CMSIS-RTOS v2.
  *
- * @author Balazs Racz
- * @date 2 March 2019
+ * @date 17 December 2025
  */
 
-// For backward compatibility, include the new unified RTOS header
-#include "rtos_includes.h"
+#ifndef _RTOS_INCLUDES_H_
+#define _RTOS_INCLUDES_H_
+
+#include "openmrn_features.h"
+
+// Detect which RTOS is being used
+#if defined(OPENMRN_FEATURE_RTOS_FREERTOS) || defined(__FreeRTOS__)
+    #define USING_FREERTOS 1
+    #include <FreeRTOS.h>
+    #include <task.h>
+    #include <semphr.h>
+    #include <queue.h>
+    #define NSEC_TO_TICK(ns) ((ns) >> NSEC_TO_TICK_SHIFT)
+
+#elif defined(OPENMRN_FEATURE_RTOS_THREADX) || defined(TX_THREAD_H)
+    #define USING_THREADX 1
+    #include "tx_api.h"
+    // ThreadX tick conversion (assuming 100Hz tick rate, adjust as needed)
+    #define NSEC_TO_TICK(ns) (((ns) * TX_TIMER_TICKS_PER_SECOND) / 1000000000ULL)
+
+#elif defined(OPENMRN_FEATURE_RTOS_CMSIS_V2)
+    #define USING_CMSIS_RTOS_V2 1
+    #include "cmsis_os2.h"
+    // CMSIS-RTOS v2 tick conversion
+    #define NSEC_TO_TICK(ns) (((ns) * osKernelGetTickFreq()) / 1000000000ULL)
+
+#else
+    #error "No RTOS selected. Define OPENMRN_FEATURE_RTOS_FREERTOS, OPENMRN_FEATURE_RTOS_THREADX, or OPENMRN_FEATURE_RTOS_CMSIS_V2"
+#endif
+
+#endif // _RTOS_INCLUDES_H_
