@@ -23,6 +23,8 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
+#include "main.h"
+#include "stm32h5xx_nucleo.h"
 
 /* USER CODE END Includes */
 
@@ -94,7 +96,12 @@ UINT App_ThreadX_Init(VOID *memory_ptr)
 void AppThreadX_Entry(ULONG thread_input)
 {
   /* USER CODE BEGIN AppThreadX_Entry */
-
+  while (1)
+  {
+    /* Toggle LED1 every 500 ms */
+    BSP_LED_Toggle(LED_GREEN);
+    tx_thread_sleep(500);
+  }
   /* USER CODE END AppThreadX_Entry */
 }
 

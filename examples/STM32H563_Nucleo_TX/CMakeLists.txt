@@ -17,6 +17,8 @@ if(NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE "Debug")
 endif()
 
+include("gcc-arm-none-eabi.cmake")
+
 # Set the project name
 set(CMAKE_PROJECT_NAME Tx_OpenMRNLite)
 
