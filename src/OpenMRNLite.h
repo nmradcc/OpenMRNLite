@@ -36,7 +36,10 @@
 #ifndef _ARDUINO_OPENMRNLITE_H_
 #define _ARDUINO_OPENMRNLITE_H_
 
+
+#if defined(ARDUINO) || defined(ARDUINO_ARCH_STM32) || defined(ARDUINO_FEATHER_M4_CAN)
 #include <Arduino.h>
+#endif
 
 #include "CDIXMLGenerator.hxx"
 #include "executor/Notifiable.hxx"
