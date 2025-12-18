@@ -92,7 +92,7 @@ UINT App_ThreadX_Init(VOID *memory_ptr)
     return TX_POOL_ERROR;
   }
   /* Create OpenMRNLite task.  */
-  if (tx_thread_create(&tx_openmrnlite_thread, "OpenMRNLite", OpenMRNLite_client_Entry, 0, &hfdcan1,
+  if (tx_thread_create(&tx_openmrnlite_thread, "OpenMRNLite", OpenMRNLite_client_Entry, 0, pointer,
                        2048, 10, 10,
                        TX_NO_TIME_SLICE, TX_AUTO_START) != TX_SUCCESS)
   {

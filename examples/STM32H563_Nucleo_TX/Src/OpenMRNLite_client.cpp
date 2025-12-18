@@ -32,8 +32,8 @@ void OpenMRNLite_client_Entry(ULONG thread_input)
     while (1)
     {
         // Main OpenMRNLite processing loop
-        
-        tx_thread_sleep(10);
+        BSP_LED_Toggle(LED_YELLOW);
+        tx_thread_sleep(200);
     }
 }
 
