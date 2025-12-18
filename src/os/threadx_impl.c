@@ -100,6 +100,18 @@ int os_mutex_unlock_threadx(os_mutex_t *mutex)
     return (status == TX_SUCCESS) ? 0 : -1;
 }
 
+int os_mutex_destroy_threadx(os_mutex_t *mutex)
+{
+    UINT status = tx_mutex_delete(&mutex->mutex);
+    return (status == TX_SUCCESS) ? 0 : -1;
+}
+
+int os_recursive_mutex_init_threadx(os_mutex_t *mutex)
+{
+    // ThreadX mutexes are already recursive by default
+    return os_mutex_init_threadx(mutex);
+}
+
 int os_sem_init_threadx(os_sem_t *sem, unsigned int value)
 {
     UINT status = tx_semaphore_create(&sem->sem, "openmrn_sem", value);
@@ -125,6 +137,12 @@ int os_sem_timedwait_threadx(os_sem_t *sem, long long timeout_nsec)
     return (status == TX_SUCCESS) ? 0 : -1;
 }
 
+int os_sem_destroy_threadx(os_sem_t *sem)
+{
+    UINT status = tx_semaphore_delete(&sem->sem);
+    return (status == TX_SUCCESS) ? 0 : -1;
+}
+
 os_thread_t os_thread_self_threadx(void)
 {
     return tx_thread_identify();
@@ -135,6 +153,33 @@ void os_thread_sleep_threadx(long long nsec)
     ULONG ticks = NSEC_TO_TICK(nsec);
     if (ticks == 0) ticks = 1;
     tx_thread_sleep(ticks);
+}
+
+TX_QUEUE* os_mq_create_threadx(size_t length, size_t item_size)
+{
+    TX_QUEUE *queue = (TX_QUEUE *)malloc(sizeof(TX_QUEUE));
+    if (queue == NULL)
+    {
+        return NULL;
+    }
+    
+    void *queue_memory = malloc(length * item_size * sizeof(ULONG));
+    if (queue_memory == NULL)
+    {
+        free(queue);
+        return NULL;
+    }
+    
+    UINT status = tx_queue_create(queue, "openmrn_queue", item_size / sizeof(ULONG), 
+                                   queue_memory, length * item_size * sizeof(ULONG));
+    if (status != TX_SUCCESS)
+    {
+        free(queue_memory);
+        free(queue);
+        return NULL;
+    }
+    
+    return queue;
 }
 
 #endif // USING_THREADX

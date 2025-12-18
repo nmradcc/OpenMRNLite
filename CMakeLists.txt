@@ -60,10 +60,10 @@ endif()
 
 # Add OS layer sources based on RTOS selection
 if(OPENMRN_RTOS STREQUAL "ThreadX")
-    # Include ThreadX-specific implementation
-    file(GLOB OS_SOURCES src/os/*.cpp src/os/threadx_impl.c)
-    # Exclude MDNS.cpp and OSSelectWakeup.cpp which require full select() support
-    list(FILTER OS_SOURCES EXCLUDE REGEX ".*/(MDNS|OSSelectWakeup|OS)\\.cpp$")
+    # Include ThreadX-specific implementation and os.c for global symbols
+    file(GLOB OS_SOURCES src/os/*.cpp src/os/threadx_impl.c src/os/os.c)
+    # Exclude MDNS.cpp and OS.cpp which require full select() support (OSSelectWakeup has ThreadX support)
+    list(FILTER OS_SOURCES EXCLUDE REGEX ".*/(MDNS|OS)\\.cpp$")
 elseif(OPENMRN_RTOS STREQUAL "CMSIS_RTOS_V2")
     file(GLOB OS_SOURCES src/os/*.cpp src/os/cmsis_rtos2_impl.c)
     list(FILTER OS_SOURCES EXCLUDE REGEX ".*/(MDNS|OSSelectWakeup|OS)\\.cpp$")
@@ -78,9 +78,6 @@ file(GLOB_RECURSE OPENMRNLITE_HEADERS
     src/*.h
     src/*.hxx
 )
-
-# Exclude platform-specific C files that may not compile on all platforms
-list(FILTER OPENMRNLITE_SOURCES EXCLUDE REGEX ".*os/os\\.c$")
 
 # Create the library
 add_library(OpenMRNLite ${OPENMRNLITE_SOURCES})

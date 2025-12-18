@@ -439,6 +439,17 @@ long long os_get_time_monotonic(void)
     portTickType tick = xTaskGetTickCount();
     time = ((long long)tick) << NSEC_TO_TICK_SHIFT;
     time += hw_get_partial_tick_time_nsec();
+#elif defined(OPENMRN_FEATURE_RTOS_THREADX)
+    // ThreadX uses TX_TIMER_TICKS_PER_SECOND for tick frequency
+    // Get current tick count
+    extern unsigned long tx_time_get(void);
+    unsigned long tick = tx_time_get();
+    // Convert ticks to nanoseconds
+    // Assuming TX_TIMER_TICKS_PER_SECOND is defined (typically 100 for ThreadX)
+    #ifndef TX_TIMER_TICKS_PER_SECOND
+    #define TX_TIMER_TICKS_PER_SECOND 100
+    #endif
+    time = ((long long)tick * 1000000000LL) / TX_TIMER_TICKS_PER_SECOND;
 #elif defined(ARDUINO)
     // redeclare micros() prototype to remove compiler warning
     unsigned long micros();
@@ -540,7 +551,17 @@ void __wrap__free_r(void *address)
  */
 unsigned sleep(unsigned seconds)
 {
+#if defined(__FreeRTOS__)
     vTaskDelay(seconds * configTICK_RATE_HZ);
+#elif defined(OPENMRN_FEATURE_RTOS_THREADX)
+    extern unsigned int tx_thread_sleep(unsigned long ticks);
+    tx_thread_sleep(seconds * TX_TIMER_TICKS_PER_SECOND);
+#else
+    struct timespec ts;
+    ts.tv_sec = seconds;
+    ts.tv_nsec = 0;
+    nanosleep(&ts, NULL);
+#endif
     return 0;
 }
 
@@ -549,10 +570,25 @@ unsigned sleep(unsigned seconds)
  */
 int usleep(useconds_t usec)
 {
+#if defined(__FreeRTOS__)
     long long nsec = usec;
     nsec *= 1000;
     vTaskDelay(nsec >> NSEC_TO_TICK_SHIFT);
     return 0;
+#elif defined(OPENMRN_FEATURE_RTOS_THREADX)
+    // Convert microseconds to ThreadX ticks
+    extern void tx_thread_sleep(unsigned long ticks);
+    unsigned long ticks = (usec * TX_TIMER_TICKS_PER_SECOND) / 1000000;
+    if (ticks == 0 && usec > 0) ticks = 1;
+    tx_thread_sleep(ticks);
+    return 0;
+#else
+    // Generic POSIX implementation
+    struct timespec ts;
+    ts.tv_sec = usec / 1000000;
+    ts.tv_nsec = (usec % 1000000) * 1000;
+    return nanosleep(&ts, NULL);
+#endif
 }
 
 void abort(void)

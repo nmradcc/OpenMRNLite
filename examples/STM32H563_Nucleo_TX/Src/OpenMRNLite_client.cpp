@@ -3,7 +3,39 @@
 #include "OpenMRNLite_client.h"
 #include "main.h"
 
+#include <OpenMRNLite.h>
+
+/// This is the OpenLCB Node ID. It must be coming from the Node ID range
+/// assigned to the developer (get a range assigned to you via openlcb.org).
+static constexpr uint64_t NODE_ID = UINT64_C(0x050101011824);
+
+OpenMRN openmrn(NODE_ID);
+
+namespace openlcb
+{
+/// SNIP dynamic filename (not used in this minimal example)
+extern const char *const SNIP_DYNAMIC_FILENAME = nullptr;
+} // namespace openlcb
+
 extern "C" {
+
+// Stub for buffer_malloc (used by dynamic buffer pool)
+void *buffer_malloc(size_t size)
+{
+    return malloc(size);
+}
+
+// Implementation of usleep for ThreadX
+// newlib declares it but doesn't provide an implementation for embedded targets
+int usleep(useconds_t usec)
+{
+    // ThreadX tick rate is 1000 Hz (1 ms per tick)
+    // Convert microseconds to milliseconds
+    unsigned long ticks = (usec + 999) / 1000;
+    if (ticks == 0 && usec > 0) ticks = 1;
+    tx_thread_sleep(ticks);
+    return 0;
+}
 
 void OpenMRNLite_client_Entry(ULONG thread_input)
 {

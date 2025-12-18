@@ -34,6 +34,12 @@
 #include "os/OSSelectWakeup.hxx"
 #include "utils/logging.h"
 
+#if defined(OPENMRN_FEATURE_RTOS_THREADX)
+extern "C" {
+#include "tx_api.h"
+}
+#endif
+
 void empty_signal_handler(int)
 {
 }
@@ -42,6 +48,34 @@ int OSSelectWakeup::select(int nfds, fd_set *readfds,
                            fd_set *writefds, fd_set *exceptfds,
                            long long deadline_nsec)
 {
+#if defined(OPENMRN_FEATURE_RTOS_THREADX)
+    // ThreadX doesn't support select(), so we implement a simple sleep-based version
+    {
+        AtomicHolder l(this);
+        inSelect_ = true;
+        if (pendingWakeup_)
+        {
+            deadline_nsec = 0;
+        }
+    }
+    
+    if (deadline_nsec > 0)
+    {
+        // Convert nanoseconds to ThreadX ticks (1000 ticks per second)
+        unsigned long ticks = (deadline_nsec + 999999) / 1000000; // Convert to milliseconds (ticks)
+        if (ticks == 0) ticks = 1;
+        tx_thread_sleep(ticks);
+    }
+    
+    {
+        AtomicHolder l(this);
+        pendingWakeup_ = false;
+        inSelect_ = false;
+    }
+    
+    // Return 0 (timeout) since we don't actually check any file descriptors
+    return 0;
+#else
     {
         AtomicHolder l(this);
         inSelect_ = true;
@@ -93,4 +127,5 @@ int OSSelectWakeup::select(int nfds, fd_set *readfds,
         inSelect_ = false;
     }
     return ret;
+#endif // OPENMRN_FEATURE_RTOS_THREADX
 }
