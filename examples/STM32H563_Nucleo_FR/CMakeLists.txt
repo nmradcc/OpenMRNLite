@@ -21,7 +21,7 @@ endif()
 include("gcc-arm-none-eabi.cmake")
 
 # Set the project name
-set(CMAKE_PROJECT_NAME STM32H563_Nucleo_TX)
+set(CMAKE_PROJECT_NAME STM32H563_Nucleo_FR)
 
 # Enable compile command to ease indexing with e.g. clangd
 set(CMAKE_EXPORT_COMPILE_COMMANDS TRUE)
@@ -39,10 +39,6 @@ add_executable(${CMAKE_PROJECT_NAME})
 # Add STM32CubeMX generated sources
 add_subdirectory(cmake/stm32cubemx)
 
-# Add OpenMRNLite library
-set(OPENMRN_RTOS "ThreadX" CACHE STRING "Select RTOS" FORCE)
-add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/../.. ${CMAKE_CURRENT_BINARY_DIR}/openmrn)
-
 # Link directories setup
 target_link_directories(${CMAKE_PROJECT_NAME} PRIVATE
     # Add user defined library search paths
@@ -51,14 +47,11 @@ target_link_directories(${CMAKE_PROJECT_NAME} PRIVATE
 # Add sources to executable
 target_sources(${CMAKE_PROJECT_NAME} PRIVATE
     # Add user sources here
-    Src/OpenMRNLite_client.cpp
-    Src/OpenMRNLite_server.cpp
 )
 
 # Add include paths
 target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE
     # Add user defined include paths
-    Inc
 )
 
 # Add project symbols (macros)
@@ -72,7 +65,6 @@ list(REMOVE_ITEM CMAKE_C_IMPLICIT_LINK_LIBRARIES ob)
 # Add linked libraries
 target_link_libraries(${CMAKE_PROJECT_NAME}
     stm32cubemx
-    OpenMRNLite
 
     # Add user defined libraries
 )
