@@ -44,14 +44,6 @@ DynamicPool *ForwardAllocator::kbytePool_ =
 
 static constexpr unsigned MALLOC_OVERHEAD = sizeof(void *);
 
-#ifdef GTEST
-// static
-void ForwardAllocator::TEST_recreate_pool()
-{
-    delete kbytePool_;
-    kbytePool_ = new DynamicPool(Bucket::init(sizeof(BufferType), 0));
-}
-#endif
 
 ForwardAllocator::ForwardAllocator()
 {

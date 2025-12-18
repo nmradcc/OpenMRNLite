@@ -172,7 +172,6 @@ public:
         }
     }
 
-#ifdef GTEST
     /// Requests to exit any timed operation.
     /// @return true if a timer was woken up.
     bool shutdown()
@@ -185,7 +184,6 @@ public:
         }
         return false;
     }
-#endif
 
     /// @return the state of this stream sender.
     StreamSenderState get_state()

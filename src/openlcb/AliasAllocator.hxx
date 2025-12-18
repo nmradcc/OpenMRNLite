@@ -158,11 +158,6 @@ public:
      * @param alias a reserved node alias. */
     void add_allocated_alias(NodeAlias alias);
 
-#ifdef GTEST
-    /** If there is a pending alias allocation waiting for the timer to expire,
-     * finishes it immediately. Needed in test destructors. */
-    void TEST_finish_pending_allocation();
-
     /** Adds an allocated aliad to the reserved aliases queue.
         @param alias the next allocated alias to add.
     */
@@ -173,7 +168,6 @@ public:
     {
         reserveUnusedAliases_ = count;
     }
-#endif
 
 private:
     /** Listens to incoming CAN frames and handles alias conflicts. */

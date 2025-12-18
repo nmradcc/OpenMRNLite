@@ -25,46 +25,12 @@
  * POSSIBILITY OF SUCH DAMAGE.
  *
  * \file freertos_includes.h
- * This file simplifies the include path for FreeRTOS header files between
- * platforms.
+ * This file provides backward compatibility by including the new unified
+ * RTOS abstraction layer. New code should include rtos_includes.h directly.
  *
  * @author Balazs Racz
  * @date 2 March 2019
  */
 
-#ifdef ESP_PLATFORM
-
-#include <freertos/FreeRTOS.h>
-#include <freertos/task.h>
-#include <freertos/semphr.h>
-#include "sdkconfig.h"
-
-#define NSEC_TO_TICK(ns)                                                       \
-    (((((long long)(ns)) / 1000 * configTICK_RATE_HZ) + 999999) / 1000000)
-
-// IDF v5.0 has introduced a configuration option (disabled by default) which
-// enables the usage of legacy FreeRTOS data types, if that configuration option
-// is *NOT* selected *AND* IDF v5.0+ is in use we need to add compatibility
-// defines in order to compile OpenMRN successfully.
-#if !defined(CONFIG_FREERTOS_ENABLE_BACKWARD_COMPATIBILITY)
-
-// used in os/os.c and os/os.h
-#define portTickType                  TickType_t
-#define xTaskHandle                   TaskHandle_t
-#define xQueueHandle                  QueueHandle_t
-#define xSemaphoreHandle              SemaphoreHandle_t
-
-// used in freertos_drivers/common/CpuLoad.hxx and os/os.c
-#define pcTaskGetTaskName             pcTaskGetName
-
-#endif // IDF v5.0+ and !CONFIG_FREERTOS_ENABLE_BACKWARD_COMPATIBILITY
-
-#else
-
-#include <FreeRTOS.h>
-#include <task.h>
-#include <semphr.h>
-
-#define NSEC_TO_TICK(ns) ((ns) >> NSEC_TO_TICK_SHIFT)
-
-#endif
+// For backward compatibility, include the new unified RTOS header
+#include "rtos_includes.h"

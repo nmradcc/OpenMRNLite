@@ -81,11 +81,7 @@ public:
         return true;
     }
 
-#if defined(GTEST)
-    void shutdown();
-
     bool is_shutdown();
-#endif
 
 private:
     /// Handle requested identification message.
@@ -201,9 +197,6 @@ private:
     //BroadcastTimeAlarmDate alarmDate_; ///< date rollover alarm
     time_t secondsRequested_; ///< pending clock time in seconds
     uint16_t updateRequested_ : 1; ///< clock settings have change
-#if defined(GTEST)
-    uint16_t shutdown_ : 1;
-#endif
 
     BroadcastTimeServerTime *time_;
     BroadcastTimeServerSync *sync_;

@@ -40,23 +40,7 @@
 #include "openmrn_features.h"
 #include <unistd.h>
 
-#ifdef __WINNT__
-#include <winsock2.h>
-#else
 #include <sys/select.h>
-#endif
-
-#ifdef __EMSCRIPTEN__
-#include <emscripten.h>
-#endif
-
-#ifdef ESP_NONOS
-extern "C" {
-#include <ets_sys.h>
-#include <osapi.h>
-#include <user_interface.h>
-}
-#endif
 
 #include "executor/Service.hxx"
 #include "nmranet_config.h"
@@ -211,82 +195,6 @@ long long ICACHE_FLASH_ATTR  ExecutorBase::loop_some() {
     return 0;
 }
 
-#if defined(__EMSCRIPTEN__)
-
-void executor_loop_some(void* arg)
-{
-    ExecutorBase* b = static_cast<ExecutorBase*>(arg);
-    while (b->loop_once());
-}
-
-void *ExecutorBase::entry()
-{
-    started_ = 1;
-    sequence_ = 0;
-    ExecutorBase* b = this;
-    unlock_from_thread();
-    emscripten_set_main_loop_arg(&executor_loop_some, b, 100, true);
-    return nullptr;
-}
-
-#elif defined(ESP_NONOS)
-
-#define EXECUTOR_TASK_PRIO USER_TASK_PRIO_0
-
-static os_event_t appl_task_queue[1];
-static os_timer_t appl_task_timer;
-static bool timer_pending = false;
-
-extern "C" {
-void ets_timer_setfn(os_timer_t *ptimer, os_timer_func_t *pfunction, void *);
-void ets_timer_arm_new(os_timer_t *, int, int, int);
-void ets_timer_disarm(os_timer_t *ptimer);
-}  // extern C
-
-static void timer_fun(void* arg) {
-    timer_pending = false;
-    system_os_post(EXECUTOR_TASK_PRIO, 0, (uint32_t)arg);
-}
-
-extern void wakeup_executor(ExecutorBase* executor);
-
-void wakeup_executor(ExecutorBase* arg) {
-    system_os_post(EXECUTOR_TASK_PRIO, 0, (uint32_t)arg);
-}
-
-static void appl_task(os_event_t *e)
-{
-    ExecutorBase* eb = (ExecutorBase*)e->par;
-    long long sleep_time = eb->loop_some();
-    if (sleep_time == 0) {
-        system_os_post(EXECUTOR_TASK_PRIO, 0, e->par);
-    } else {
-        if (true || timer_pending) {
-            os_timer_disarm(&appl_task_timer);
-        }
-        os_timer_arm(&appl_task_timer, sleep_time / 1000000, false);
-        timer_pending = true;
-    }
-}
-
-void ICACHE_FLASH_ATTR *ExecutorBase::entry()
-{
-    started_ = 1;
-    os_timer_setfn(&appl_task_timer, &timer_fun, this);
-    system_os_task(appl_task, EXECUTOR_TASK_PRIO, appl_task_queue, 1);
-    system_os_post(EXECUTOR_TASK_PRIO, 0, (uint32_t)this);
-    return nullptr;
-}
-
-#elif OPENMRN_FEATURE_SINGLE_THREADED
-
-void *ExecutorBase::entry()
-{
-    DIE("Arduino code should not start the executor.");
-    return nullptr;
-}
-
-#else
 /** Thread entry point.
  * @return Should never return
  */
@@ -425,30 +333,14 @@ void ExecutorBase::wait_with_select(long long wait_length)
     selectNFds_ = max_fd;
 }
 
-#endif
-
-#if defined(ARDUINO)
-// declare the function rather than include Arduino.h
-extern "C"
-{
-void delay(unsigned long);
-}
-#endif // ARDUINO
 void ExecutorBase::shutdown()
 {
     if (!started_) return;
     add(this);
-#if defined(__EMSCRIPTEN__)
-    emscripten_cancel_main_loop();
-    return;
-#endif    
+    
     while (!done_)
     {
-#if defined(ARDUINO)
-        delay(1);
-#else
         usleep(100);
-#endif        
     }
 }
 

@@ -42,7 +42,6 @@
 #include "freertos_drivers/common/RamDisk.hxx"
 #endif
 
-#ifndef __WINNT__
 #include "os/TempFile.hxx"
 
 namespace openlcb {
@@ -79,5 +78,4 @@ private:
 
 }  // namespace openlcb
 
-#endif // !winnt
 #endif // _OPENLCB_SIMPLENODEINFOMOCKUSERFILE_HXX_

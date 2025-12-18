@@ -146,15 +146,6 @@ public:
         start_flow(STATE(allocate_logon_now));
     }
 
-#ifdef GTEST
-    void shutdown()
-    {
-        needShutdown_ = 1;
-        timer_.ensure_triggered();
-        logonSelect_.ensure_triggered();
-    }
-#endif
-
     // Callbacks from LogonFeedback
 
     /// Determines based on feedback key what the given DCC packet was.

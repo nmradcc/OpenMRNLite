@@ -298,7 +298,6 @@ template <class HFlow, class ReadFlow = HubDeviceSelectReadFlow<HFlow>>
 class HubDeviceSelect : public FdHubPortService, private Atomic
 {
 public:
-#ifndef __WINNT__
     /// Creates a select-aware hub port for the device specified by `path'.
     HubDeviceSelect(
         HFlow *hub, const char *path, Notifiable *on_error = nullptr)
@@ -315,7 +314,6 @@ public:
         hub_->register_port(write_port());
         isRegistered_ = true;
     }
-#endif
 
     /// Creates a select-aware hub port for the opened device specified by
     /// `fd'. It can be a hardware device, socket or pipe.
@@ -334,12 +332,7 @@ public:
         barrier_.reset(
             on_error ? on_error : EmptyNotifiable::DefaultInstance());
         barrier_.new_child();
-#ifdef __WINNT__
-        unsigned long par = 1;
-        ioctlsocket(fd_, FIONBIO, &par);
-#else
         ::fcntl(fd, F_SETFL, O_RDWR | O_NONBLOCK);
-#endif
         hub_->register_port(write_port());
         isRegistered_ = true;
     }

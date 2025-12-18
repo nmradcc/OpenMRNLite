@@ -35,6 +35,9 @@
 #ifndef _UTILS_JSHUBPORT_HXX_
 #define _UTILS_JSHUBPORT_HXX_
 
+// __EMSCRIPTEN__ support has been removed
+
+/*
 #ifdef __EMSCRIPTEN__
 
 #include <emscripten.h>
@@ -182,4 +185,5 @@ EMSCRIPTEN_BINDINGS(js_hub_module)
 }
 
 #endif // __EMSCRIPTEN__
+*/
 #endif // _UTILS_JSHUBPORT_HXX_

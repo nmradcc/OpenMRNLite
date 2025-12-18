@@ -50,12 +50,6 @@
 #include "utils/macros.h"
 #include "os/OSSelectWakeup.hxx"
 
-#ifdef ESP_NONOS
-extern "C" {
-#include <ets_sys.h>
-}
-#endif
-
 class ActiveTimers;
 
 /** This class implements an execution of tasks pulled off an input queue.
@@ -307,12 +301,7 @@ public:
     {
         queue_.insert(
             msg, priority >= NUM_PRIO ? NUM_PRIO - 1 : priority);
-#ifdef ESP_NONOS
-        extern void wakeup_executor(ExecutorBase* executor);
-        wakeup_executor(this);
-#else
         selectHelper_.wakeup();
-#endif
     }
 
 #if OPENMRN_FEATURE_RTOS_FROM_ISR
@@ -323,17 +312,8 @@ public:
      */
     void add_from_isr(Executable *msg, unsigned priority = UINT_MAX) override
     {
-#ifdef ESP_PLATFORM
-        // On the ESP32 we need to call insert instead of insert_locked to
-        // ensure that all code paths lock the queue for consistency since
-        // this code path is not guaranteed to be protected by a critical
-        // section.
-        queue_.insert(
-            msg, priority >= NUM_PRIO ? NUM_PRIO - 1 : priority);
-#else
         queue_.insert_locked(
             msg, priority >= NUM_PRIO ? NUM_PRIO - 1 : priority);
-#endif // ESP_PLATFORM
         selectHelper_.wakeup_from_isr();
     }
 #endif // OPENMRN_FEATURE_RTOS_FROM_ISR

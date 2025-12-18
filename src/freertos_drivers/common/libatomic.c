@@ -35,35 +35,7 @@
 
 #include <stdint.h>
 
-#ifdef ESP_NONOS
-
-#ifndef __STRINGIFY
-#define __STRINGIFY(a) #a
-#endif
-
-// these low level routines provide a replacement for SREG interrupt save that AVR uses
-// but are esp8266 specific. A normal use pattern is like
-//
-//{
-//    uint32_t savedPS = xt_rsil(1); // this routine will allow level 2 and above
-//    // do work here
-//    xt_wsr_ps(savedPS); // restore the state
-//}
-//
-// level (0-15), interrupts of the given level and above will be active
-// level 15 will disable ALL interrupts,
-// level 0 will enable ALL interrupts,
-//
-#define xt_rsil(level) (__extension__({uint32_t state; __asm__ __volatile__("rsil %0," __STRINGIFY(level) : "=a" (state)); state;}))
-#define xt_wsr_ps(state)  __asm__ __volatile__("wsr %0,ps; isync" :: "a" (state) : "memory")
-
-
-#define ACQ_LOCK()                              \
-    uint32_t savedPS = xt_rsil(15);
-
-#define REL_LOCK()  xt_wsr_ps(savedPS);
-
-#elif defined(STM32F0xx) || (!defined(ARDUINO) && !defined(ESP_PLATFORM))
+#if defined(STM32F0xx) || !defined(ARDUINO)
 // On Cortex-M0 the only way to do atomic operation is to disable interrupts.
 
 /// Disables interrupts and saves the interrupt enable flag in a register.

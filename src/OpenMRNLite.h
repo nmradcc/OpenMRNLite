@@ -36,7 +36,10 @@
 #ifndef _ARDUINO_OPENMRNLITE_H_
 #define _ARDUINO_OPENMRNLITE_H_
 
+
+#if defined(ARDUINO) || defined(ARDUINO_ARCH_STM32) || defined(ARDUINO_FEATHER_M4_CAN)
 #include <Arduino.h>
+#endif
 
 #include "CDIXMLGenerator.hxx"
 #include "executor/Notifiable.hxx"
@@ -47,47 +50,6 @@
 #include "utils/GridConnectHub.hxx"
 #include "utils/logging.h"
 #include "utils/Uninitialized.hxx"
-
-#if defined(ESP_PLATFORM)
-
-#include <esp_task.h>
-#include <esp_task_wdt.h>
-
-namespace openmrn_arduino
-{
-
-/// Default stack size to use for all OpenMRN tasks on the ESP32 platform.
-constexpr uint32_t OPENMRN_STACK_SIZE = 4096L;
-
-/// Default thread priority for any OpenMRN owned tasks on the ESP32 platform.
-/// Note: This is set to one priority level lower than the TCP/IP task uses on
-/// the ESP32.
-constexpr UBaseType_t OPENMRN_TASK_PRIORITY = ESP_TASK_TCPIP_PRIO - 1;
-
-} // namespace openmrn_arduino
-
-#include "freertos_drivers/esp32/Esp32Gpio.hxx"
-#include "freertos_drivers/esp32/Esp32SocInfo.hxx"
-
-// If we are using ESP-IDF v4.3 (or later) enable the Esp32Ledc API.
-#include "freertos_drivers/esp32/Esp32Ledc.hxx"
-
-// ESP32-H2 and ESP32-C2 do not have a built-in TWAI controller.
-#if !defined(CONFIG_IDF_TARGET_ESP32H2) && !defined(CONFIG_IDF_TARGET_ESP32C2)
-
-// If we are using ESP-IDF v4.3 (or later) enable the usage of the TWAI device.
-#include "freertos_drivers/esp32/Esp32Can.hxx"
-
-#endif // NOT ESP32-H2 and NOT ESP32-C2
-
-#include "freertos_drivers/esp32/Esp32HardwareSerialAdapter.hxx"
-#include "freertos_drivers/esp32/Esp32WiFiManager.hxx"
-
-// On the ESP32 we have persistent file system access so enable
-// dynamic CDI.xml generation support
-#define HAVE_FILESYSTEM
-
-#endif // ESP32
 
 #ifdef ARDUINO_ARCH_STM32
 #include "freertos_drivers/stm32/Stm32Can.hxx"
@@ -408,15 +370,6 @@ public:
     /// Note: this method will not return until the @ref Executor has shutdown.
     void loop_executor()
     {
-#if defined(ESP32) && CONFIG_TASK_WDT
-        uint32_t current_core = xPortGetCoreID();
-        TaskHandle_t idleTask = xTaskGetIdleTaskHandleForCore(current_core);
-        // check if watchdog is enabled and print a warning if it is
-        if (esp_task_wdt_status(idleTask) == ESP_OK)
-        {
-            LOG(WARNING, "WDT detected as enabled on core %d!", current_core);
-        }
-#endif // ESP32 && CONFIG_TASK_WDT
         haveExecutorThread_ = true;
 
         // donate this thread to the executor
@@ -424,44 +377,11 @@ public:
     }
 
     /// Starts a thread for the @ref Executor used by OpenMRN.
-    ///
-    /// Note: On the ESP32 the watchdog timer is disabled for the PRO_CPU prior
-    /// to starting the background task for the @ref Executor.
     void start_executor_thread()
     {
         haveExecutorThread_ = true;
-#ifdef ESP32
-#if CONFIG_TASK_WDT_CHECK_IDLE_TASK_CPU0
-        // Remove IDLE0 task watchdog, because the openmrn task sometimes
-        // uses 100% cpu and it is pinned to CPU 0.
-        {
-            esp_task_wdt_config_t twdt_config = {
-                .timeout_ms = CONFIG_ESP_TASK_WDT_TIMEOUT_S * 1000,
-                .idle_core_mask = 0,
-#if CONFIG_ESP_TASK_WDT_PANIC
-                .trigger_panic = true,
-#endif
-            };
-#if CONFIG_ESP_TASK_WDT_CHECK_IDLE_TASK_CPU0
-            // core 0 should not be checked ever.
-#endif
-#if CONFIG_ESP_TASK_WDT_CHECK_IDLE_TASK_CPU1
-            twdt_config.idle_core_mask |= (1 << 1);
-#endif
-            ESP_ERROR_CHECK(esp_task_wdt_reconfigure(&twdt_config));
-        }
-#endif // CONFIG_TASK_WDT_CHECK_IDLE_TASK_CPU0
-        xTaskCreatePinnedToCore(&thread_entry         // entry point
-                              , "OpenMRN"             // task name
-                              , OPENMRN_STACK_SIZE    // stack size
-                              , this                  // entry point arg
-                              , OPENMRN_TASK_PRIORITY // priority
-                              , nullptr               // task handle
-                              , PRO_CPU_NUM);         // cpu core
-#else // NOT ESP32
         stack_->executor()->start_thread(
             "OpenMRN", 0 /* default priority */, 0 /* default stack size */);
-#endif // ESP32
     }
 #endif // OPENMRN_FEATURE_SINGLE_THREADED
 

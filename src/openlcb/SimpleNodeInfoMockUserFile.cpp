@@ -55,7 +55,7 @@ openlcb::MockSNIPUserFile::~MockSNIPUserFile()
 {
 }
 
-#elif !defined(__WINNT__)
+#else
 #include "os/TempFile.hxx"
 
 openlcb::MockSNIPUserFile::MockSNIPUserFile(const char *user_name,

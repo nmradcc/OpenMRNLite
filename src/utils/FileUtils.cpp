@@ -35,34 +35,6 @@
 #include <string>
 
 #include "utils/macros.h"
-
-#ifdef __EMSCRIPTEN__
-
-#include <emscripten.h>
-#include <emscripten/val.h>
-
-string read_file_to_string(const string &filename)
-{
-    using emscripten::val;
-    EM_ASM(var fs = require('fs'); Module.fs = fs;);
-    val fs = val::module_property("fs");
-    string contents = fs.call<val>("readFileSync", string(filename),
-                             string("binary")).as<string>();
-    return contents;
-}
-
-void write_string_to_file(const string &filename, const string &data)
-{
-    using emscripten::val;
-    EM_ASM(var fs = require('fs'); Module.fs = fs;);
-    val fs = val::module_property("fs");
-    fs.call<val>("writeFileSync", string(filename),
-        emscripten::typed_memory_view(data.size(), (uint8_t *)data.data()),
-        string("binary"));
-}
-
-#else
-
 #include <stdio.h>
 #include <string.h>
 #include <errno.h>
@@ -128,5 +100,3 @@ void write_string_to_file(const string &filename, const string &data)
     }
     fclose(f);
 }
-
-#endif

@@ -61,9 +61,6 @@ public:
         , expires_(0)
         , running_(false)
         , set_(false)
-#if defined(GTEST)
-        , shutdown_(false)
-#endif
         , updateSubscribeHandle_(clock->update_subscribe_add(
               std::bind(&BroadcastTimeAlarm::update_notify, this)))
     {
@@ -122,18 +119,10 @@ public:
         // rather than waking up the state flow, just let it expire naturally.
     }
 
-#if defined(GTEST)
-    void shutdown()
-    {
-        shutdown_ = true;
-        wakeup_.trigger();
-    }
-
     bool is_shutdown()
     {
         return is_terminated();
     }
-#endif
 
 protected:
     /// Entry point to state flow.
@@ -213,13 +202,6 @@ private:
     ///         setup() if clock and/or alarm is not currently active
     Action setup()
     {
-#if defined(GTEST)
-        if (shutdown_)
-        {
-            return exit();
-        }
-#endif
-
         AtomicHolder h(this);
         if (set_)
         {
@@ -299,9 +281,6 @@ private:
     time_t expires_; ///< time at which the alarm expires
     uint8_t running_  : 1; ///< true if running (alarm armed), else false
     uint8_t set_      : 1; ///< true if a start request is pending
-#if defined(GTEST)
-    uint8_t shutdown_ : 1; ///< true if test has requested shutdown
-#endif
     /// handle to the update subscrition used for unsubcribing in the destructor
     BroadcastTime::UpdateSubscribeHandle updateSubscribeHandle_;
 

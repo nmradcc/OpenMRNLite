@@ -106,14 +106,7 @@ private:
     long long current_time()
     {
         long long t;
-#ifdef __linux__
-        struct timespec ts;
-        clock_gettime(CLOCK_REALTIME, &ts);
-        t = ts.tv_sec * 1000000000;
-        t += ts.tv_nsec;
-#else
         t = os_get_time_monotonic();
-#endif
         return t;
     }
 

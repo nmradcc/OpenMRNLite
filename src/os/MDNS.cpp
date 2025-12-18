@@ -37,7 +37,6 @@
 /** Turn on/off debug print statements */
 #define MDNS_DEBUG 0
 
-#if !defined (__linux__)
 void mdns_publish(const char *name, const char *service, uint16_t port) __attribute__ ((weak));
 void mdns_unpublish(const char *name, const char *service) __attribute__ ((weak));
 int mdns_lookup(const char *service, struct addrinfo *hints,
@@ -89,46 +88,13 @@ void mdns_scan(const char *service)
 {
     HASSERT(0);
 }
-#endif
 
 /*
  * MDNS::publish()
  */
 void MDNS::publish(const char *name, const char *service, uint16_t port)
 {
-#if defined (__linux__)
-    name = avahi_strdup(name);
-
-    if (!group_)
-    {
-        group_ = avahi_entry_group_new(client_, entry_group_callback, this);
-        if (!group_)
-        {
-            fprintf(stderr, "avahi_entry_group_new() failed: %s\n",
-                avahi_strerror(avahi_client_errno(client_)));
-            return;
-        }
-        HASSERT(group_);
-    }
-
-    int result = avahi_entry_group_add_service(group_, AVAHI_IF_UNSPEC,
-                                               AVAHI_PROTO_UNSPEC,
-                                               (AvahiPublishFlags)0, name,
-                                               service, NULL, NULL,
-                                               port, NULL);
-    
-    if (result != 0)
-    {
-#if MDNS_DEBUG
-        fprintf(stderr, "Error exporting mDNS name (%d) %s\n", result,
-                avahi_strerror(result));
-#endif
-        return;
-    }
-    HASSERT(result == 0);
-#else
     mdns_publish(name, service, port);
-#endif
 }
 
 /*
@@ -136,11 +102,7 @@ void MDNS::publish(const char *name, const char *service, uint16_t port)
  */
 void MDNS::unpublish(const char *name, const char *service)
 {
-#if defined(__linux__)
-    DIE("unimplemented");
-#else
     mdns_unpublish(name, service);
-#endif
 }
 
 /*
@@ -149,92 +111,7 @@ void MDNS::unpublish(const char *name, const char *service)
 int MDNS::lookup(const char *service, struct addrinfo *hints,
                  struct addrinfo **addr)
 {
-#if defined (__linux__)
-    LookupUserdata lu(hints);
-    AvahiServiceBrowser *sb = nullptr;
-    int error;
-    int result = 0;
-    int protocol;
-
-
-    switch (hints->ai_family)
-    {
-        case AF_INET:
-            protocol = AVAHI_PROTO_INET;
-            break;
-        case AF_INET6:
-            protocol = AVAHI_PROTO_INET6;
-            break;
-        case AF_UNSPEC:
-            protocol = AVAHI_PROTO_UNSPEC;
-            break;
-        default:
-            result = EAI_FAMILY;
-            goto fail;
-    }
-
-    *addr = nullptr;
-
-    lu.sp = avahi_simple_poll_new();
-    if (!lu.sp)
-    {
-        result = EAI_MEMORY;
-        goto fail;
-    }
-
-    lu.c = avahi_client_new(avahi_simple_poll_get(lu.sp),
-                            (AvahiClientFlags)0, client_callback,
-                            nullptr, &error);
-
-    if (!lu.c)
-    {
-        result = EAI_MEMORY;
-        goto fail;
-    }
-
-    sb = avahi_service_browser_new(lu.c, AVAHI_IF_UNSPEC, protocol, service,
-                                   nullptr, (AvahiLookupFlags)0,
-                                   browse_callback, (void*)&lu);
-
-    if (!sb)
-    {
-        result = EAI_MEMORY;
-        goto fail;
-    }
-
-    avahi_simple_poll_loop(lu.sp);
-
-    if (lu.addr)
-    {
-        *addr = lu.addr;
-        printf("lu.addr\n");
-    }
-    else
-    {
-        *addr = nullptr;
-        result = EAI_NONAME;
-    }
-
-fail:
-    if (sb)
-    {
-        avahi_service_browser_free(sb);
-    }
-
-    if (lu.c)
-    {
-        avahi_client_free(lu.c);
-    }
-
-    if (lu.sp)
-    {
-        avahi_simple_poll_free(lu.sp);
-    }
-
-    return result;
-#else
     return mdns_lookup(service, hints, addr);
-#endif
 }
 
 /*
@@ -242,32 +119,8 @@ fail:
  */
 void MDNS::scan(const char *service)
 {
-#if defined (__linux__)
-#else
     mdns_scan(service);
-#endif
 }
-
-#if defined (__linux__)
-/*
- * MDNS::resolve_callback()
- */
-void MDNS::resolve_callback(AvahiServiceResolver *r,
-                            AvahiIfIndex interface, AvahiProtocol protocol,
-                            AvahiResolverEvent event, const char *name,
-                            const char *type, const char *domain,
-                            const char *host_name,
-                            const AvahiAddress *address, uint16_t port,
-                            AvahiStringList *txt,
-                            AvahiLookupResultFlags flags, void* userdata)
-{
-    HASSERT(r);
-    LookupUserdata *lu = static_cast<LookupUserdata*>(userdata);
-
-    /* Called whenever a service has been resolved successfully or timed out */
-    switch (event)
-    {
-        case AVAHI_RESOLVER_FAILURE:
 #if MDNS_DEBUG
             fprintf(stderr, "(Resolver) Failed to resolve service '%s' of type "
                             "'%s' in domain '%s': %s\n", name, type, domain,

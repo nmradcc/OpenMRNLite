@@ -502,7 +502,6 @@ public:
     /** default destructor */
     ~DynamicPool()
     {
-#ifdef GTEST
         for (unsigned i = 0; buckets[i].size() != 0; ++i)
         {
             // Frees all memory left in the bucket.
@@ -516,7 +515,6 @@ public:
                 ::free(p);
             } while (true);
         }
-#endif
         Bucket::destroy(buckets);
     }
 

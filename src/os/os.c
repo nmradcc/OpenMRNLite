@@ -34,7 +34,7 @@
 
 #ifndef _DEFAULT_SOURCE
 #define _DEFAULT_SOURCE
-#endif
+#endif // _DEFAULT_SOURCE
 
 /// Forces one definition of each inline function to be compiled.
 #define OS_INLINE extern
@@ -42,28 +42,12 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <fcntl.h>
-#if !defined (GCC_MEGA_AVR)
 #include <unistd.h>
-#endif // !GCC_MEGA_AVR
 
 #if defined (__FreeRTOS__)
 #include "devtab.h"
 #include "FreeRTOS.h"
 #include "task.h"
-
-#elif defined(__WIN32__)
-
-#include <winsock2.h>
-#include <ws2tcpip.h> /* socklen_t */
-#include <time.h>
-#include <signal.h>
-
-#elif defined(ESP_NONOS)
-
-#include <sys/select.h>
-#include <sched.h>
-#include <signal.h>
-#include <user_interface.h>
 
 #else
 
@@ -106,40 +90,6 @@ long long rtcOffset = 0;
  * version) that does not forward these function calls to the implementations
  * we have. We are thus forced to override their weak definition of these
  * functions. */
-#if defined(TARGET_PIC32MX) || defined(ESP_NONOS)
-#include "reent.h"
-
-#ifndef _READ_WRITE_RETURN_TYPE
-#define _READ_WRITE_RETURN_TYPE ssize_t
-#endif
-
-int open(const char* b, int flags, ...)
-{
-    return _open_r(_impure_ptr, b, flags, 0);
-}
-int close(int fd)
-{
-    return _close_r(_impure_ptr, fd);
-}
-_READ_WRITE_RETURN_TYPE read(int fd, void* buf, size_t count)
-{
-    return _read_r(_impure_ptr, fd, buf, count);
-}
-_READ_WRITE_RETURN_TYPE write(int fd, const void* buf, size_t count)
-{
-    return _write_r(_impure_ptr, fd, buf, count);
-}
-off_t lseek(int fd, off_t offset, int whence)
-{
-    return _lseek_r(_impure_ptr, fd, offset, whence);
-}
-int fstat(int fd, struct stat* buf)
-{
-    return _fstat_r(_impure_ptr, fd, buf);
-}
-
-#endif
-
 
 #if OPENMRN_FEATURE_THREAD_FREERTOS
 /// Task list entriy
@@ -228,95 +178,6 @@ int os_thread_once(os_thread_once_t *once, void (*routine)(void))
 }
 #endif
 
-#if defined (__WIN32__)
-/** Windows does not support pipes, so we made our own with a pseudo socketpair.
- * @param fildes fildes[0] is open for reading, filedes[1] is open for writing
- * @return 0 upon success, else -1 with errno set to indicate error
- */
-int pipe(int fildes[2])
-{
-    struct sockaddr_in addr;  
-    int listener, connector, acceptor;
-    socklen_t addrlen = sizeof(addr);
-
-    if ((listener = socket(AF_INET, SOCK_STREAM, 0)) <= 0)
-    {
-        errno = EMFILE;
-        return -1;
-    }
-    if ((connector = socket(AF_INET, SOCK_STREAM, 0)) <= 0)
-    {
-        closesocket(listener);
-        errno = EMFILE;
-        return -1;
-    }
-    
-    memset(&addr, 0, sizeof(addr));
-    addr.sin_family = AF_INET;
-    addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
-    addr.sin_port = 0; 
-
-    int reuse = 0;
-    if (setsockopt(listener, SOL_SOCKET, SO_REUSEADDR, 
-                   (char*)&reuse, (socklen_t)sizeof(reuse)) < 0)
-    {
-        closesocket(listener);
-        closesocket(connector);
-        errno = EMFILE;
-        return -1;
-    }
-
-    if (bind(listener, (const struct sockaddr*)&addr, sizeof(addr)) < 0)
-    {
-        closesocket(listener);
-        closesocket(connector);
-        errno = EMFILE;
-        return -1;
-    }
-    
-    if  (getsockname(listener, (struct sockaddr*)&addr, &addrlen) < 0)
-    {
-        closesocket(listener);
-        closesocket(connector);
-        errno = EMFILE;
-        return -1;
-    }
-
-    if (listen(listener, 1) < 0)
-    {
-        closesocket(listener);
-        closesocket(connector);
-        errno = EMFILE;
-        return -1;
-    }
-
-    if (connect(connector, (const struct sockaddr*)&addr, addrlen) < 0)
-    {
-        closesocket(listener);
-        closesocket(connector);
-        errno = EMFILE;
-        return -1;
-    }
-   
-    if ((acceptor = accept(listener, NULL, NULL)) < 0)
-    {
-        closesocket(listener);
-        closesocket(connector);
-        errno = EMFILE;
-        return  -1;
-    }
-
-    int flag = 1;
-    setsockopt(connector, IPPROTO_TCP, TCP_NODELAY, (char*)&flag, sizeof(int));
-    setsockopt(acceptor, IPPROTO_TCP, TCP_NODELAY, (char*)&flag, sizeof(int));
-
-    fildes[0] = connector;
-    fildes[1] = acceptor;
-    closesocket(listener);
-    return 0;
-}
-#endif
-
 #if OPENMRN_FEATURE_THREAD_FREERTOS
 extern const void* stack_malloc(unsigned long length);
 
@@ -384,8 +245,8 @@ void os_thread_start(void *arg)
 #else
     // legacy implementation uses task tag
     vTaskSetApplicationTaskTag(NULL, NULL);
-#endif
-#endif
+#endif // tskKERNEL_VERSION_MAJOR
+#endif // OPENMRN_FEATURE_DEVICE_SELECT
 
     // execute thread entry point
     void *result = (*priv->entry)(priv->arg);
@@ -432,7 +293,7 @@ int __attribute__((weak)) os_thread_create_helper(os_thread_t *thread,
                                 (StaticTask_t *) malloc(sizeof(StaticTask_t)));
 #else
 #error FREERTOS version v9.0.0 or later required
-#endif
+#endif // configSUPPORT_STATIC_ALLOCATION
     return 0;
 }
 #endif // OPENMRN_FEATURE_THREAD_FREERTOS
@@ -501,7 +362,7 @@ int os_thread_create(os_thread_t *thread, const char *name, int priority,
         }
     }
     return result;
-#endif
+#endif // OPENMRN_FEATURE_THREAD_FREERTOS
 #if OPENMRN_FEATURE_THREAD_PTHREAD    
     pthread_attr_t attr;
 
@@ -555,12 +416,12 @@ int os_thread_create(os_thread_t *thread, const char *name, int priority,
     {
         pthread_setname_np(*thread, name);
     }
-#endif
+#endif // OPENMRN_HAVE_PTHREAD_SETNAME
 
     return result;
-#endif // pthread implementation
+#endif // OPENMRN_FEATURE_THREAD_PTHREAD
 }
-#endif // not single threaded
+#endif // !OPENMRN_FEATURE_SINGLE_THREADED
 
 /// Implement this function to read timing more accurately than 1 msec in
 /// FreeRTOS.
@@ -576,69 +437,21 @@ long long os_get_time_monotonic(void)
     portTickType tick = xTaskGetTickCount();
     time = ((long long)tick) << NSEC_TO_TICK_SHIFT;
     time += hw_get_partial_tick_time_nsec();
-#elif defined (__MACH__)
-    /* get the timebase info */
-    mach_timebase_info_data_t info;
-    mach_timebase_info(&info);
-    
-    /* get the timestamp */
-    time = (long long)mach_absolute_time();
-    
-    /* convert to nanoseconds */
-    time *= info.numer;
-    time /= info.denom;
-#elif defined (__WIN32__)
-    struct timeval tv;
-    gettimeofday(&tv, NULL);
-    time = ((long long)tv.tv_sec * 1000LL * 1000LL * 1000LL) +
-           ((long long)tv.tv_usec * 1000LL);
-#elif defined(ARDUINO)
-    // redeclare micros() prototype to remove compiler warning
-    unsigned long micros();
-    
-    static uint32_t last_micros = 0;
-    static uint32_t overflow_micros = 0;
-
-    os_atomic_lock();
-    uint32_t new_micros = (uint32_t) micros();
-    if (new_micros < last_micros)
-    {
-        ++overflow_micros;
-    }
-    last_micros = new_micros;
-    os_atomic_unlock();
-    
-    time = overflow_micros;
-    time <<= 32;
-    time += new_micros;
-    time *= 1000;    // Convert micros to nanos
-#elif defined(ESP_NONOS)
-    static uint32_t clockmul = 0;
-    if (clockmul == 0) {
-        clockmul = system_rtc_clock_cali_proc();
-        clockmul *= 1000;
-        clockmul >>= 10;
-    }
-    time = system_get_rtc_time();
-    time *= clockmul;
-    time >>= 2;
+#elif defined(OPENMRN_FEATURE_RTOS_THREADX)
+    // ThreadX uses TX_TIMER_TICKS_PER_SECOND for tick frequency
+    // Get current tick count
+    extern unsigned long tx_time_get(void);
+    unsigned long tick = tx_time_get();
+    // Convert ticks to nanoseconds
+    // Assuming TX_TIMER_TICKS_PER_SECOND is defined (typically 100 for ThreadX)
+    #ifndef TX_TIMER_TICKS_PER_SECOND
+    #define TX_TIMER_TICKS_PER_SECOND 100
+    #endif // TX_TIMER_TICKS_PER_SECOND
+    time = ((long long)tick * 1000000000LL) / TX_TIMER_TICKS_PER_SECOND;
 #else
-
     struct timespec ts;
-#if defined (__nuttx__)
-    clock_gettime(CLOCK_REALTIME, &ts);
-#else
     clock_gettime(CLOCK_MONOTONIC, &ts);
-#endif
     time = ((long long)ts.tv_sec * 1000000000LL) + ts.tv_nsec;
-
-#ifdef GTEST
-    long long fake_time = os_get_fake_time();
-    if (fake_time >= 0)
-    {
-        return fake_time;
-    }
-#endif // not GTEST
 
 #endif
     /* This logic ensures that every successive call is one value larger
@@ -659,24 +472,9 @@ long long os_get_time_monotonic(void)
     return time;
 }
 
-#if defined(__EMSCRIPTEN__)
-int os_thread_once(os_thread_once_t *once, void (*routine)(void))
-{
-    if (once->state == OS_THREAD_ONCE_NEVER)
-    {
-        once->state = OS_THREAD_ONCE_INPROGRESS;
-        routine();
-        once->state = OS_THREAD_ONCE_DONE;
-    }
-    else if (once->state == OS_THREAD_ONCE_INPROGRESS)
-    {
-        DIE("Recursive call to os_thread_once.");
-    }
-    return 0;
-}
-#endif
-
+/* ==================== FreeRTOS-specific implementations ==================== */
 #if defined (__FreeRTOS__)
+
 /* standard C library hooks for multi-threading */
 
 /** Lock access to malloc.
@@ -725,14 +523,28 @@ void __wrap__free_r(void *address)
     __real__free_r(address);
     __malloc_unlock();
 }
-#endif
+#endif // _REENT_SMALL
+
+#endif // __FreeRTOS__
+
+/* ==================== RTOS-agnostic standard library implementations ==================== */
 
 /** Implementation of standard sleep().
  * @param seconds number of seconds to sleep
  */
 unsigned sleep(unsigned seconds)
 {
+#if defined(__FreeRTOS__)
     vTaskDelay(seconds * configTICK_RATE_HZ);
+#elif defined(OPENMRN_FEATURE_RTOS_THREADX)
+    extern unsigned int tx_thread_sleep(unsigned long ticks);
+    tx_thread_sleep(seconds * TX_TIMER_TICKS_PER_SECOND);
+#else
+    struct timespec ts;
+    ts.tv_sec = seconds;
+    ts.tv_nsec = 0;
+    nanosleep(&ts, NULL);
+#endif // FreeRTOS vs ThreadX vs POSIX
     return 0;
 }
 
@@ -741,23 +553,40 @@ unsigned sleep(unsigned seconds)
  */
 int usleep(useconds_t usec)
 {
+#if defined(__FreeRTOS__)
     long long nsec = usec;
     nsec *= 1000;
     vTaskDelay(nsec >> NSEC_TO_TICK_SHIFT);
     return 0;
+#elif defined(OPENMRN_FEATURE_RTOS_THREADX)
+    // Convert microseconds to ThreadX ticks
+    extern unsigned int tx_thread_sleep(unsigned long ticks);
+    unsigned long ticks = (usec * TX_TIMER_TICKS_PER_SECOND) / 1000000;
+    if (ticks == 0 && usec > 0) ticks = 1;
+    tx_thread_sleep(ticks);
+    return 0;
+#else
+    // Generic POSIX implementation
+    struct timespec ts;
+    ts.tv_sec = usec / 1000000;
+    ts.tv_nsec = (usec % 1000000) * 1000;
+    return nanosleep(&ts, NULL);
+#endif // FreeRTOS vs ThreadX vs POSIX
 }
 
 void abort(void)
 {
-#if defined(TARGET_LPC2368) || defined(TARGET_LPC11Cxx) || \
-    defined(TARGET_LPC1768) || defined(GCC_ARMCM3) || defined (GCC_ARMCM0) || \
-    defined(TARGET_PIC32MX)
+#if defined(TARGET_LPC2368) || \
+    defined(TARGET_LPC1768) || defined(GCC_ARMCM3) || defined (GCC_ARMCM0)
     diewith(BLINK_DIE_ABORT);
-#endif
+#endif // TARGET_LPC*
     for (;;)
     {
     }
 }
+
+/* ==================== FreeRTOS-specific heap and task management ==================== */
+#if defined (__FreeRTOS__)
 
 /* magic that allows for an optional second heap region */
 char __attribute__((weak)) __heap2_start_alias;
@@ -870,23 +699,10 @@ void vApplicationIdleHook( void )
     xTaskResumeAll();
 }
 
-#ifdef TARGET_PIC32MX
-static void __attribute__((nomips16)) os_yield_trampoline(void)
-{
-    taskYIELD();
-}
-
-void __attribute__((nomips16)) os_isr_exit_yield_test(int woken)
-{
-   portEND_SWITCHING_ISR(woken); 
-}
-
-#else
 static inline void __attribute__((always_inline)) os_yield_trampoline(void)
 {
     taskYIELD();
 }
-#endif
 
 /** Entry point to the main thread.
  * @param arg unused argument
@@ -909,14 +725,14 @@ static void *main_thread(void *unused)
     abort();
     return NULL;
 }
-#else // not freertos
+#else // !__FreeRTOS__
 
 ssize_t __attribute__((weak)) os_get_free_heap()
 {
     return -1;
 }
 
-#endif
+#endif // __FreeRTOS__
 
 /** This function does nothing. It can be used to alias other symbols to it via
  * linker flags, such as atexit(). @return 0. */
@@ -925,11 +741,7 @@ int ignore_fn(void)
     return 0;
 }
 
-#if !defined(ARDUINO) && !defined(ESP_PLATFORM)
-
-#if !defined (__MINGW32__)
 int main(int argc, char *argv[]) __attribute__ ((weak));
-#endif
 
 /** Entry point to program.
  * @param argc number of command line arguments
@@ -942,7 +754,6 @@ int main(int argc, char *argv[])
     /* initialize the processor hardware */
     hw_init();
 
-#ifndef TARGET_LPC11Cxx
     /* stdin */
     if (open(STDIN_DEVICE, O_RDWR) < 0)
     {
@@ -958,7 +769,6 @@ int main(int argc, char *argv[])
     {
         open("/dev/null", O_WRONLY);
     }
-#endif
 
     int priority;
     if (config_main_thread_priority() == 0xdefa01)
@@ -974,26 +784,7 @@ int main(int argc, char *argv[])
                      config_main_thread_stack_size(), main_thread, NULL);
 
     vTaskStartScheduler();
-#else
-#if defined (__WIN32__)
-    /* enable Windows networking */
-    WSADATA wsa_data;
-    WSAStartup(WINSOCK_VERSION, &wsa_data);
-#endif
+#else // !__FreeRTOS__
     return appl_main(argc, argv);
-#endif
+#endif // __FreeRTOS__
 }
-
-#endif // ESP_PLATFORM
-
-#if defined(ARDUINO)
-unsigned critical_nesting;
-#endif
-
-#if 0 && defined(ESP_NONOS)
-struct _reent *_impure_ptr = NULL;
-static int my_errno;
-int* __errno(void) {
-    return &my_errno;
-}
-#endif

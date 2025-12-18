@@ -42,8 +42,6 @@
 #include "utils/logging.h"
 #ifdef __FreeRTOS__
 #include "freertos/can_ioctl.h"
-#elif defined(ESP32)
-#include "can_ioctl.h"
 #endif
 
 #include "openlcb/ConfigUpdateFlow.hxx"
@@ -69,11 +67,7 @@ void reboot()
 namespace openlcb
 {
 
-#ifdef GTEST
-static constexpr unsigned FACTORY_RESET_REBOOT_DELAY_MSEC = 50;
-#else
 static constexpr unsigned FACTORY_RESET_REBOOT_DELAY_MSEC = 500;
-#endif
 
 uint16_t __attribute__((weak, noinline))
 MemoryConfigHandler::app_handle_factory_reset(NodeID target)

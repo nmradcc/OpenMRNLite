@@ -40,10 +40,6 @@
 #include "utils/LinkedObject.hxx"
 #include "utils/macros.h"
 
-#ifdef GTEST
-// #define DEBUG_DATA_BUFFER_FREE
-#endif
-
 class DataBufferPool;
 
 #ifdef DEBUG_DATA_BUFFER_FREE
@@ -664,14 +660,6 @@ public:
         HASSERT(payload_size <= 65535u - sizeof(BufferBase));
     }
 
-#ifdef GTEST
-    /// Use this variable with a ScopedOverride to temporarily change how much
-    /// data gets allocated.
-    uint16_t *payload_size_override()
-    {
-        return &payloadSize_;
-    }
-#endif
 
     /// Number of free items in the pool.
     size_t free_items() override

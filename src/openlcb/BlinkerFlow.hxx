@@ -64,9 +64,6 @@ private:
     Action blinker()
     {
         state_ = !state_;
-#ifdef __linux__
-        LOG(INFO, "blink produce %d", state_);
-#endif
         producer_.Update(&helper_, n_.reset(this));
         return wait_and_call(STATE(handle_sleep));
     }

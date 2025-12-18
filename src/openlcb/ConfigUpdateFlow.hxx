@@ -86,25 +86,6 @@ public:
         return fd_;
     }
 
-#ifdef GTEST
-    void TEST_set_fd(int fd)
-    {
-        fd_ = fd;
-    }
-    bool TEST_is_terminated()
-    {
-        return is_terminated();
-    }
-    bool TEST_get_needs_reboot()
-    {
-        return needsReboot_;
-    }
-    bool TEST_get_needs_reinit()
-    {
-        return needsReInit_;
-    }
-#endif // GTEST
-
     void trigger_update() override
     {
         AtomicHolder h(this);

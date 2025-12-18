@@ -96,13 +96,6 @@ public:
         {
         }
 
-#ifdef GTEST        
-        /// Used in unittests to cleanly shutdown the bus master.
-        void request_shutdown()
-        {
-            needShutdown_ = true;
-        }
-
         /// Used in unittests to cleanly shutdown the bus master.
         void shutdown()
         {

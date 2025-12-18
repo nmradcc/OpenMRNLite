@@ -39,10 +39,6 @@
 #include "openlcb/EventHandlerTemplates.hxx"
 #include "openlcb/EventService.hxx"
 
-#ifdef __linux__
-//#define DESCRIBE_VAR
-#endif
-
 #ifdef DESCRIBE_VAR
 extern int debug_variables;
 int debug_variables = 0;
@@ -136,7 +132,6 @@ void BitRangeEventPC::Set(unsigned bit, bool new_value, WriteHelper *writer,
             event++;
         writer->WriteAsync(node_, Defs::MTI_EVENT_REPORT, WriteHelper::global(),
                            eventid_to_buffer(event), done);
-#ifndef TARGET_LPC11Cxx
         if (!done)
         {
             // We wait for the sent-out event to come back. Otherwise there is a
@@ -149,7 +144,6 @@ void BitRangeEventPC::Set(unsigned bit, bool new_value, WriteHelper *writer,
                 usleep(100);
             }
         }
-#endif
     }
     else
     {

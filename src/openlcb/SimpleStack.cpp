@@ -37,11 +37,6 @@
 #define LOGLEVEL INFO
 #endif
 
-#if defined(__linux__) || defined(__MACH__)
-#include <net/if.h>
-#include <termios.h> /* tc* functions */
-#endif
-
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <unistd.h>
@@ -279,8 +274,8 @@ int SimpleStackBase::create_config_file_if_needed(const InternalConfigData &cfg,
         extend = true;
     }
     // Handle the case where the file exists but is too short for the verison
-    // check. This was observed on the esp32 with SD storage which does not
-    // automatically flush to disk on write.
+    // check. This can happen with SD storage which does not automatically
+    // flush to disk on write.
     if ((long)statbuf.st_size < (long)cfg.version().end_offset())
     {
         LOG(VERBOSE, "%s is too short (%d vs %d), forcing reset.",
@@ -422,35 +417,6 @@ void SimpleCanStackBase::add_gridconnect_port(
     create_gc_port_for_can_hub(can_hub(), fd, on_exit);
 }
 
-#if defined(__linux__) || defined(__MACH__)
-void SimpleCanStackBase::add_gridconnect_tty(
-    const char *device, Notifiable *on_exit)
-{
-    int fd = ::open(device, O_RDWR);
-    HASSERT(fd >= 0);
-    LOG(INFO, "Adding device %s as fd %d", device, fd);
-    create_gc_port_for_can_hub(can_hub(), fd, on_exit);
-
-    HASSERT(!tcflush(fd, TCIOFLUSH));
-    struct termios settings;
-    HASSERT(!tcgetattr(fd, &settings));
-    cfmakeraw(&settings);
-    cfsetspeed(&settings, B115200);
-    HASSERT(!tcsetattr(fd, TCSANOW, &settings));
-}
-#endif
-#if defined(__linux__)
-void SimpleCanStackBase::add_socketcan_port_select(
-    const char *device, int loopback)
-{
-    int s = socketcan_open(device, loopback);
-    if (s >= 0)
-    {
-        auto *port = new HubDeviceSelect<CanHubFlow>(can_hub(), s);
-        additionalComponents_.emplace_back(port);
-    }
-}
-#endif
 extern Pool *const __attribute__((__weak__)) g_incoming_datagram_allocator =
     init_main_buffer_pool();
 

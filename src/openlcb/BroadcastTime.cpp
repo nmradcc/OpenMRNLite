@@ -46,10 +46,8 @@ namespace openlcb
 //
 void BroadcastTime::clear_timezone()
 {
-#ifndef ESP_PLATFORM
     setenv("TZ", "GMT0", 1);
     tzset();
-#endif
 }
 
 //

@@ -270,17 +270,6 @@ public:
         return extended_ ? 0 : scanData_.size();
     }
 
-#if defined(GTEST)
-    std::basic_string<uint8_t> &test_get_data()
-    {
-        return data_;
-    }
-
-    std::basic_string<uint8_t> &test_get_scan_data()
-    {
-        return scanData_;
-    }
-#endif
 
 private:
     /// advertising data, also used for extended advertising

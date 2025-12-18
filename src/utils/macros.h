@@ -41,9 +41,7 @@
 #include <string>
 #include <utility>
 
-#ifndef ARDUINO
 using std::map;
-#endif
 using std::vector;
 using std::string;
 using std::pair;
@@ -51,13 +49,6 @@ using std::pair;
 #endif
 
 #include <stdlib.h>   // for abort
-
-#if defined(__EMSCRIPTEN__) 
-#if defined(EXPECT_DEATH)
-#undef EXPECT_DEATH
-#endif
-#define EXPECT_DEATH(x...) 
-#endif
 
 #ifdef __cplusplus
 extern "C" {
@@ -87,42 +78,6 @@ extern const char* g_death_file;
 #define HASSERT(x) do { if (!(x)) { RECORD_DEATH(); abort(); } } while(0)
 
 #define DIE(MSG) abort()
-
-#elif defined(ESP32) || defined(ESP_PLATFORM)
-
-#include <stdio.h>
-#include <assert.h>
-
-// Locate the relevant version of ets_sys.h based on the IDF_TARGET
-#if defined(CONFIG_IDF_TARGET_ESP32)
-#include <esp32/rom/ets_sys.h>
-#elif defined(CONFIG_IDF_TARGET_ESP32S2)
-#include <esp32s2/rom/ets_sys.h>
-#elif defined(CONFIG_IDF_TARGET_ESP32S3)
-#include <esp32s3/rom/ets_sys.h>
-#elif defined(CONFIG_IDF_TARGET_ESP32C3)
-#include <esp32c3/rom/ets_sys.h>
-#else
-#error Unknown/Unsupported ESP32 variant.
-#endif // CONFIG_IDF_TARGET_ESP32
-
-// For the ESP32 we are using ets_printf() instead of printf() to avoid the
-// internal locking within the newlib implementation. This locking can cause
-// difficult to parse backtraces when an ISR is on the same core as the code
-// that crashes due to these two macros.
-
-#define HASSERT(x) do { if (!(x)) { ets_printf("Assertion failed in file " __FILE__ " line %d: assert(%s)\n", __LINE__, #x); g_death_file = __FILE__; g_death_lineno = __LINE__; assert(0); abort();} } while(0)
-
-#define DIE(MSG) do { ets_printf("Crashed in file " __FILE__ " line %d: " MSG "\n", __LINE__); assert(0); abort(); } while(0)
-
-#elif defined(ESP_NONOS) || defined(ARDUINO)
-
-#include <stdio.h>
-#include <assert.h>
-
-#define HASSERT(x) do { if (!(x)) { printf("Assertion failed in file " __FILE__ " line %d: assert(%s)\n", __LINE__, #x); g_death_file = __FILE__; g_death_lineno = __LINE__; assert(0); abort();} } while(0)
-
-#define DIE(MSG) do { printf("Crashed in file " __FILE__ " line %d: " MSG "\n", __LINE__); assert(0); abort(); } while(0)
 
 #else
 
@@ -214,16 +169,12 @@ extern const char* g_death_file;
 #define C_STATIC_ASSERT(expr, name) \
     typedef unsigned char __attribute__((unused)) __static_assert_##name[expr ? 0 : -1]
 
-#if defined(ARDUINO_ARCH_ESP32)
-#include <esp8266-compat.h>
-#elif !defined(ESP_NONOS)
 /// Declares (on the ESP8266) that the current function is not executed too
 /// often and should be placed in the SPI flash.
 #define ICACHE_FLASH_ATTR
 /// Declares (on the ESP8266) that the current function is executed
 /// often and should be placed in the instruction RAM.
 #define ICACHE_RAM_ATTR
-#endif
 
 /// Retrieve a parent pointer from a member class variable. UNSAFE.
 /// Usage:
@@ -246,14 +197,6 @@ extern const char* g_death_file;
 
 /// Macro to signal a function that the result must be used.
 #define MUST_USE_RESULT __attribute__((__warn_unused_result__))
-
-#ifdef ESP32
-/// Workaround for broken header in endian.h for the ESP32
-#include <endian.h>
-#ifndef __bswap64
-#define __bswap64(x) __bswap_64(x)
-#endif
-#endif
 
 
 #endif // _UTILS_MACROS_H_

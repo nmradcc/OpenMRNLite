@@ -38,10 +38,6 @@
 #include "os/OS.hxx"
 #include "utils/logging.h"
 
-#ifdef GTEST
-#define TEST_CONSISTENCY
-#endif
-
 namespace openlcb
 {
 

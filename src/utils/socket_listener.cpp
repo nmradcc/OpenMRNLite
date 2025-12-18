@@ -46,12 +46,9 @@
 #include "utils/logging.h"
 #include "utils/macros.h"
 
-#ifndef ESP_PLATFORM
-// these don't exist on the ESP32 with LWiP
 #include <arpa/inet.h>
 #include <netinet/in.h>
 #include <netinet/tcp.h>
-#endif // ESP_PLATFORM
 #include <netdb.h>
 #include <sys/socket.h>
 #include <sys/types.h>
