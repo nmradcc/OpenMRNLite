@@ -1,7 +1,7 @@
-/* OpenMRNLite Application Header */
+/* OpenMRNLite Client Application Header */
 
-#ifndef __OPENMRNLITE_H
-#define __OPENMRNLITE_H
+#ifndef __OPENMRNLITE_CLIENT_H
+#define __OPENMRNLITE_CLIENT_H
 
 #ifdef __cplusplus
 extern "C" {
@@ -14,10 +14,10 @@ extern "C" {
   * @param  thread_input: Thread input parameter
   * @retval None
   */
-void OpenMRNLite_Entry(ULONG thread_input);
+void OpenMRNLite_client_Entry(ULONG thread_input);
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif /* __OPENMRNLITE_H */
+#endif /* __OPENMRNLITE_CLIENT_H */

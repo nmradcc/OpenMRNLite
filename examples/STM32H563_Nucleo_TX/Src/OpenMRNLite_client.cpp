@@ -1,11 +1,11 @@
-/* OpenMRNLite Application Entry Point */
+/* OpenMRNLite Client Application Entry Point */
 
-#include "OpenMRNLite.h"
+#include "OpenMRNLite_client.h"
 #include "main.h"
 
 extern "C" {
 
-void OpenMRNLite_Entry(ULONG thread_input)
+void OpenMRNLite_client_Entry(ULONG thread_input)
 {
     // Initialize OpenMRNLite here
     

@@ -25,7 +25,7 @@
 /* USER CODE BEGIN Includes */
 #include "main.h"
 #include "stm32h5xx_nucleo.h"
-#include "OpenMRNLite.h"
+#include "OpenMRNLite_client.h"
 
 /* USER CODE END Includes */
 
@@ -92,7 +92,7 @@ UINT App_ThreadX_Init(VOID *memory_ptr)
     return TX_POOL_ERROR;
   }
   /* Create OpenMRNLite task.  */
-  if (tx_thread_create(&tx_openmrnlite_thread, "OpenMRNLite", OpenMRNLite_Entry, 0, pointer,
+  if (tx_thread_create(&tx_openmrnlite_thread, "OpenMRNLite", OpenMRNLite_client_Entry, 0, &hfdcan1,
                        2048, 10, 10,
                        TX_NO_TIME_SLICE, TX_AUTO_START) != TX_SUCCESS)
   {
