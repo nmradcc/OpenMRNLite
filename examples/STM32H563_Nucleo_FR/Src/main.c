@@ -22,7 +22,8 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-
+#include "FreeRTOS.h"
+#include "portable.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -101,6 +102,21 @@ int main(void)
   /* USER CODE BEGIN 2 */
 
   /* USER CODE END 2 */
+
+  /* Initialize heap regions for FreeRTOS heap_5 */
+  /* USER CODE BEGIN HEAP_INIT */
+  {
+    extern uint8_t _end;  /* Defined by linker */
+    extern uint8_t _estack;  /* Defined by linker */
+    
+    HeapRegion_t xHeapRegions[] =
+    {
+      { (uint8_t *) &_end, (size_t) ((uint8_t *)&_estack - (uint8_t *)&_end) },
+      { NULL, 0 }  /* Terminator */
+    };
+    vPortDefineHeapRegions(xHeapRegions);
+  }
+  /* USER CODE END HEAP_INIT */
 
   /* Init scheduler */
   osKernelInitialize();
