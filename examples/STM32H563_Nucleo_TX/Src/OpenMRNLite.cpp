@@ -1,6 +1,7 @@
 /* OpenMRNLite Application Entry Point */
 
 #include "OpenMRNLite.h"
+#include "main.h"
 
 extern "C" {
 

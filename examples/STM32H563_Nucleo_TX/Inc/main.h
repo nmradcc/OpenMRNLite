@@ -39,6 +39,7 @@ extern "C" {
 
 /* Exported types ------------------------------------------------------------*/
 /* USER CODE BEGIN ET */
+extern FDCAN_HandleTypeDef hfdcan1;
 
 /* USER CODE END ET */
 
@@ -54,6 +55,7 @@ extern "C" {
 
 /* Exported functions prototypes ---------------------------------------------*/
 void Error_Handler(void);
+void MX_FDCAN1_Init(void);
 
 /* USER CODE BEGIN EFP */
 

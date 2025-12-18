@@ -46,9 +46,8 @@
 
 /* Private variables ---------------------------------------------------------*/
 TX_THREAD tx_app_thread;
-TX_THREAD tx_openmrnlite_thread;
 /* USER CODE BEGIN PV */
-
+TX_THREAD tx_openmrnlite_thread;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
