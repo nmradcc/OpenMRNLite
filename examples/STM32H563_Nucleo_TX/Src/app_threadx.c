@@ -26,6 +26,7 @@
 #include "main.h"
 #include "stm32h5xx_nucleo.h"
 #include "OpenMRNLite_client.h"
+#include "OpenMRNLite_server.h"
 
 /* USER CODE END Includes */
 
@@ -47,7 +48,8 @@
 /* Private variables ---------------------------------------------------------*/
 TX_THREAD tx_app_thread;
 /* USER CODE BEGIN PV */
-TX_THREAD tx_openmrnlite_thread;
+TX_THREAD tx_openmrnlite_client_thread;
+TX_THREAD tx_openmrnlite_server_thread;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -85,14 +87,28 @@ UINT App_ThreadX_Init(VOID *memory_ptr)
   }
 
   /* USER CODE BEGIN App_ThreadX_Init */
-  /* Allocate the stack for OpenMRNLite task  */
+  /* Allocate the stack for OpenMRNLite client task  */
   if (tx_byte_allocate(byte_pool, (VOID**) &pointer,
                        2048, TX_NO_WAIT) != TX_SUCCESS)
   {
     return TX_POOL_ERROR;
   }
-  /* Create OpenMRNLite task.  */
-  if (tx_thread_create(&tx_openmrnlite_thread, "OpenMRNLite", OpenMRNLite_client_Entry, 0, pointer,
+  /* Create OpenMRNLite client task.  */
+  if (tx_thread_create(&tx_openmrnlite_client_thread, "OpenMRNLite_Client", OpenMRNLite_client_Entry, 0, pointer,
+                       2048, 10, 10,
+                       TX_NO_TIME_SLICE, TX_AUTO_START) != TX_SUCCESS)
+  {
+    return TX_THREAD_ERROR;
+  }
+  
+  /* Allocate the stack for OpenMRNLite server task  */
+  if (tx_byte_allocate(byte_pool, (VOID**) &pointer,
+                       2048, TX_NO_WAIT) != TX_SUCCESS)
+  {
+    return TX_POOL_ERROR;
+  }
+  /* Create OpenMRNLite server task.  */
+  if (tx_thread_create(&tx_openmrnlite_server_thread, "OpenMRNLite_Server", OpenMRNLite_server_Entry, 0, pointer,
                        2048, 10, 10,
                        TX_NO_TIME_SLICE, TX_AUTO_START) != TX_SUCCESS)
   {
