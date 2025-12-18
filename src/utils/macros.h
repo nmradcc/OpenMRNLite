@@ -41,9 +41,7 @@
 #include <string>
 #include <utility>
 
-#ifndef ARDUINO
 using std::map;
-#endif
 using std::vector;
 using std::string;
 using std::pair;
@@ -80,15 +78,6 @@ extern const char* g_death_file;
 #define HASSERT(x) do { if (!(x)) { RECORD_DEATH(); abort(); } } while(0)
 
 #define DIE(MSG) abort()
-
-#elif defined(ARDUINO)
-
-#include <stdio.h>
-#include <assert.h>
-
-#define HASSERT(x) do { if (!(x)) { printf("Assertion failed in file " __FILE__ " line %d: assert(%s)\n", __LINE__, #x); g_death_file = __FILE__; g_death_lineno = __LINE__; assert(0); abort();} } while(0)
-
-#define DIE(MSG) do { printf("Crashed in file " __FILE__ " line %d: " MSG "\n", __LINE__); assert(0); abort(); } while(0)
 
 #else
 

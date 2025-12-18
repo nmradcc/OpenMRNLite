@@ -25,18 +25,6 @@ void *buffer_malloc(size_t size)
     return malloc(size);
 }
 
-// Implementation of usleep for ThreadX
-// newlib declares it but doesn't provide an implementation for embedded targets
-int usleep(useconds_t usec)
-{
-    // ThreadX tick rate is 1000 Hz (1 ms per tick)
-    // Convert microseconds to milliseconds
-    unsigned long ticks = (usec + 999) / 1000;
-    if (ticks == 0 && usec > 0) ticks = 1;
-    tx_thread_sleep(ticks);
-    return 0;
-}
-
 void OpenMRNLite_client_Entry(ULONG thread_input)
 {
     // Initialize OpenMRNLite here

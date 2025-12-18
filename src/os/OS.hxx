@@ -733,40 +733,7 @@ private:
     /** handle to event object */
     EventGroupHandle_t event;
 };
-#elif defined(ARDUINO)
 
-typedef uint32_t OSEventType;
-
-extern "C" {
-extern unsigned critical_nesting;
-extern uint32_t SystemCoreClock;
-}
-
-#define cm3_cpu_clock_hz SystemCoreClock
-#define cpu_clock_hz SystemCoreClock
-
-#define portENTER_CRITICAL()                                                   \
-    do                                                                         \
-    {                                                                          \
-        noInterrupts();                                                        \
-        ++critical_nesting;                                                    \
-    } while (0)
-#define portEXIT_CRITICAL()                                                    \
-    do                                                                         \
-    {                                                                          \
-        if (critical_nesting <= 1)                                             \
-        {                                                                      \
-            critical_nesting = 0;                                              \
-            interrupts();                                                      \
-        }                                                                      \
-        else                                                                   \
-        {                                                                      \
-            --critical_nesting;                                                \
-        }                                                                      \
-    } while (0)
-
-#define configKERNEL_INTERRUPT_PRIORITY (0xa0)
-
-#endif  // freertos or arduino
+#endif // __FreeRTOS__
 
 #endif /* _OS_OS_HXX_ */

@@ -56,11 +56,7 @@ void EventService::register_interface(If *iface)
 
 EventService::Impl::Impl(EventService *service) : callerFlow_(service)
 {
-#ifdef TARGET_LPC11Cxx
-    registry.reset(new VectorEventHandlers());
-#else
     registry.reset(new TreeEventHandlers());
-#endif
 }
 
 EventService::Impl::~Impl()

@@ -195,15 +195,6 @@ long long ICACHE_FLASH_ATTR  ExecutorBase::loop_some() {
     return 0;
 }
 
-#if OPENMRN_FEATURE_SINGLE_THREADED
-
-void *ExecutorBase::entry()
-{
-    DIE("Arduino code should not start the executor.");
-    return nullptr;
-}
-
-#else
 /** Thread entry point.
  * @return Should never return
  */
@@ -342,15 +333,6 @@ void ExecutorBase::wait_with_select(long long wait_length)
     selectNFds_ = max_fd;
 }
 
-#endif
-
-#if defined(ARDUINO)
-// declare the function rather than include Arduino.h
-extern "C"
-{
-void delay(unsigned long);
-}
-#endif // ARDUINO
 void ExecutorBase::shutdown()
 {
     if (!started_) return;
@@ -358,11 +340,7 @@ void ExecutorBase::shutdown()
     
     while (!done_)
     {
-#if defined(ARDUINO)
-        delay(1);
-#else
         usleep(100);
-#endif        
     }
 }
 

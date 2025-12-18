@@ -34,7 +34,7 @@
 
 #ifndef _DEFAULT_SOURCE
 #define _DEFAULT_SOURCE
-#endif
+#endif // _DEFAULT_SOURCE
 
 /// Forces one definition of each inline function to be compiled.
 #define OS_INLINE extern
@@ -42,9 +42,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <fcntl.h>
-#if !defined (GCC_MEGA_AVR)
 #include <unistd.h>
-#endif // !GCC_MEGA_AVR
 
 #if defined (__FreeRTOS__)
 #include "devtab.h"
@@ -247,8 +245,8 @@ void os_thread_start(void *arg)
 #else
     // legacy implementation uses task tag
     vTaskSetApplicationTaskTag(NULL, NULL);
-#endif
-#endif
+#endif // tskKERNEL_VERSION_MAJOR
+#endif // OPENMRN_FEATURE_DEVICE_SELECT
 
     // execute thread entry point
     void *result = (*priv->entry)(priv->arg);
@@ -295,7 +293,7 @@ int __attribute__((weak)) os_thread_create_helper(os_thread_t *thread,
                                 (StaticTask_t *) malloc(sizeof(StaticTask_t)));
 #else
 #error FREERTOS version v9.0.0 or later required
-#endif
+#endif // configSUPPORT_STATIC_ALLOCATION
     return 0;
 }
 #endif // OPENMRN_FEATURE_THREAD_FREERTOS
@@ -364,7 +362,7 @@ int os_thread_create(os_thread_t *thread, const char *name, int priority,
         }
     }
     return result;
-#endif
+#endif // OPENMRN_FEATURE_THREAD_FREERTOS
 #if OPENMRN_FEATURE_THREAD_PTHREAD    
     pthread_attr_t attr;
 
@@ -418,12 +416,12 @@ int os_thread_create(os_thread_t *thread, const char *name, int priority,
     {
         pthread_setname_np(*thread, name);
     }
-#endif
+#endif // OPENMRN_HAVE_PTHREAD_SETNAME
 
     return result;
-#endif // pthread implementation
+#endif // OPENMRN_FEATURE_THREAD_PTHREAD
 }
-#endif // not single threaded
+#endif // !OPENMRN_FEATURE_SINGLE_THREADED
 
 /// Implement this function to read timing more accurately than 1 msec in
 /// FreeRTOS.
@@ -448,30 +446,9 @@ long long os_get_time_monotonic(void)
     // Assuming TX_TIMER_TICKS_PER_SECOND is defined (typically 100 for ThreadX)
     #ifndef TX_TIMER_TICKS_PER_SECOND
     #define TX_TIMER_TICKS_PER_SECOND 100
-    #endif
+    #endif // TX_TIMER_TICKS_PER_SECOND
     time = ((long long)tick * 1000000000LL) / TX_TIMER_TICKS_PER_SECOND;
-#elif defined(ARDUINO)
-    // redeclare micros() prototype to remove compiler warning
-    unsigned long micros();
-    
-    static uint32_t last_micros = 0;
-    static uint32_t overflow_micros = 0;
-
-    os_atomic_lock();
-    uint32_t new_micros = (uint32_t) micros();
-    if (new_micros < last_micros)
-    {
-        ++overflow_micros;
-    }
-    last_micros = new_micros;
-    os_atomic_unlock();
-    
-    time = overflow_micros;
-    time <<= 32;
-    time += new_micros;
-    time *= 1000;    // Convert micros to nanos
 #else
-
     struct timespec ts;
     clock_gettime(CLOCK_MONOTONIC, &ts);
     time = ((long long)ts.tv_sec * 1000000000LL) + ts.tv_nsec;
@@ -495,7 +472,9 @@ long long os_get_time_monotonic(void)
     return time;
 }
 
+/* ==================== FreeRTOS-specific implementations ==================== */
 #if defined (__FreeRTOS__)
+
 /* standard C library hooks for multi-threading */
 
 /** Lock access to malloc.
@@ -544,7 +523,11 @@ void __wrap__free_r(void *address)
     __real__free_r(address);
     __malloc_unlock();
 }
-#endif
+#endif // _REENT_SMALL
+
+#endif // __FreeRTOS__
+
+/* ==================== RTOS-agnostic standard library implementations ==================== */
 
 /** Implementation of standard sleep().
  * @param seconds number of seconds to sleep
@@ -561,7 +544,7 @@ unsigned sleep(unsigned seconds)
     ts.tv_sec = seconds;
     ts.tv_nsec = 0;
     nanosleep(&ts, NULL);
-#endif
+#endif // FreeRTOS vs ThreadX vs POSIX
     return 0;
 }
 
@@ -577,7 +560,7 @@ int usleep(useconds_t usec)
     return 0;
 #elif defined(OPENMRN_FEATURE_RTOS_THREADX)
     // Convert microseconds to ThreadX ticks
-    extern void tx_thread_sleep(unsigned long ticks);
+    extern unsigned int tx_thread_sleep(unsigned long ticks);
     unsigned long ticks = (usec * TX_TIMER_TICKS_PER_SECOND) / 1000000;
     if (ticks == 0 && usec > 0) ticks = 1;
     tx_thread_sleep(ticks);
@@ -588,19 +571,22 @@ int usleep(useconds_t usec)
     ts.tv_sec = usec / 1000000;
     ts.tv_nsec = (usec % 1000000) * 1000;
     return nanosleep(&ts, NULL);
-#endif
+#endif // FreeRTOS vs ThreadX vs POSIX
 }
 
 void abort(void)
 {
-#if defined(TARGET_LPC2368) || defined(TARGET_LPC11Cxx) || \
+#if defined(TARGET_LPC2368) || \
     defined(TARGET_LPC1768) || defined(GCC_ARMCM3) || defined (GCC_ARMCM0)
     diewith(BLINK_DIE_ABORT);
-#endif
+#endif // TARGET_LPC*
     for (;;)
     {
     }
 }
+
+/* ==================== FreeRTOS-specific heap and task management ==================== */
+#if defined (__FreeRTOS__)
 
 /* magic that allows for an optional second heap region */
 char __attribute__((weak)) __heap2_start_alias;
@@ -739,14 +725,14 @@ static void *main_thread(void *unused)
     abort();
     return NULL;
 }
-#else // not freertos
+#else // !__FreeRTOS__
 
 ssize_t __attribute__((weak)) os_get_free_heap()
 {
     return -1;
 }
 
-#endif
+#endif // __FreeRTOS__
 
 /** This function does nothing. It can be used to alias other symbols to it via
  * linker flags, such as atexit(). @return 0. */
@@ -754,8 +740,6 @@ int ignore_fn(void)
 {
     return 0;
 }
-
-#if !defined(ARDUINO)
 
 int main(int argc, char *argv[]) __attribute__ ((weak));
 
@@ -770,7 +754,6 @@ int main(int argc, char *argv[])
     /* initialize the processor hardware */
     hw_init();
 
-#ifndef TARGET_LPC11Cxx
     /* stdin */
     if (open(STDIN_DEVICE, O_RDWR) < 0)
     {
@@ -786,7 +769,6 @@ int main(int argc, char *argv[])
     {
         open("/dev/null", O_WRONLY);
     }
-#endif
 
     int priority;
     if (config_main_thread_priority() == 0xdefa01)
@@ -802,13 +784,7 @@ int main(int argc, char *argv[])
                      config_main_thread_stack_size(), main_thread, NULL);
 
     vTaskStartScheduler();
-#else
+#else // !__FreeRTOS__
     return appl_main(argc, argv);
-#endif
+#endif // __FreeRTOS__
 }
-
-#endif // ARDUINO
-
-#if defined(ARDUINO)
-unsigned critical_nesting;
-#endif

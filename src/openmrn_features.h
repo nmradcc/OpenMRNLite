@@ -70,18 +70,13 @@
 /// Enables the code using ::fstat to confirm if the file handle is a socket.
 #define OPENMRN_HAVE_SOCKET_FSTAT 1
 
-#if !defined(__FreeRTOS__) && !defined(OPENMRN_FEATURE_RTOS_THREADX) && !defined(OPENMRN_FEATURE_RTOS_CMSIS_V2) && !defined(ARDUINO)
+#if !defined(__FreeRTOS__) && !defined(OPENMRN_FEATURE_RTOS_THREADX) && !defined(OPENMRN_FEATURE_RTOS_CMSIS_V2)
 /// Uses ::pselect in the Executor for sleep and pkill for waking up.
 #define OPENMRN_HAVE_PSELECT 1
 #endif
 
 #if defined(OPENMRN_HAVE_PSELECT) || defined(OPENMRN_FEATURE_DEVICE_SELECT)
 #define OPENMRN_FEATURE_EXECUTOR_SELECT 1
-#endif
-
-#if defined(ARDUINO)
-/// A loop() function is calling the executor in the single-threaded OS context.
-#define OPENMRN_FEATURE_SINGLE_THREADED 1
 #endif
 
 #if defined(__FreeRTOS__)

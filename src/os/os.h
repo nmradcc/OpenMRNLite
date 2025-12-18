@@ -139,7 +139,7 @@ typedef struct
     unsigned char state; /**< keep track if already executed */
 } os_thread_once_t; /**< one time initialization type */
 #elif OPENMRN_FEATURE_MUTEX_FAKE
-// Used for single-threaded environments and Arduino
+// Used for single-threaded environments
 typedef struct {
     int locked;
     uint8_t recursive;
