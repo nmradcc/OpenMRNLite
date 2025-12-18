@@ -25,6 +25,7 @@
 /* USER CODE BEGIN Includes */
 #include "main.h"
 #include "stm32h5xx_nucleo.h"
+#include "OpenMRNLite.h"
 
 /* USER CODE END Includes */
 
@@ -45,6 +46,7 @@
 
 /* Private variables ---------------------------------------------------------*/
 TX_THREAD tx_app_thread;
+TX_THREAD tx_openmrnlite_thread;
 /* USER CODE BEGIN PV */
 
 /* USER CODE END PV */
@@ -84,6 +86,19 @@ UINT App_ThreadX_Init(VOID *memory_ptr)
   }
 
   /* USER CODE BEGIN App_ThreadX_Init */
+  /* Allocate the stack for OpenMRNLite task  */
+  if (tx_byte_allocate(byte_pool, (VOID**) &pointer,
+                       2048, TX_NO_WAIT) != TX_SUCCESS)
+  {
+    return TX_POOL_ERROR;
+  }
+  /* Create OpenMRNLite task.  */
+  if (tx_thread_create(&tx_openmrnlite_thread, "OpenMRNLite", OpenMRNLite_Entry, 0, pointer,
+                       2048, 10, 10,
+                       TX_NO_TIME_SLICE, TX_AUTO_START) != TX_SUCCESS)
+  {
+    return TX_THREAD_ERROR;
+  }
   /* USER CODE END App_ThreadX_Init */
 
   return ret;
