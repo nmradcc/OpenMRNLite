@@ -95,12 +95,12 @@ UINT App_ThreadX_Init(VOID *memory_ptr)
   }
   /* Create OpenMRNLite client task.  */
   if (tx_thread_create(&tx_openmrnlite_client_thread, "OpenMRNLite_Client", OpenMRNLite_client_Entry, 0, pointer,
-                       2048, 10, 10,
+                       4096, 10, 10,
                        TX_NO_TIME_SLICE, TX_AUTO_START) != TX_SUCCESS)
   {
     return TX_THREAD_ERROR;
   }
-  
+#if 0  
   /* Allocate the stack for OpenMRNLite server task  */
   if (tx_byte_allocate(byte_pool, (VOID**) &pointer,
                        2048, TX_NO_WAIT) != TX_SUCCESS)
@@ -114,6 +114,7 @@ UINT App_ThreadX_Init(VOID *memory_ptr)
   {
     return TX_THREAD_ERROR;
   }
+#endif
   /* USER CODE END App_ThreadX_Init */
 
   return ret;

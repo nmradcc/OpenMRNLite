@@ -59,6 +59,20 @@ static TX_BYTE_POOL tx_app_byte_pool;
 
 /* Private function prototypes -----------------------------------------------*/
 /* USER CODE BEGIN PFP */
+//TX_BYTE_POOL* get_app_byte_pool(void);
+
+/**
+  * @brief  Get pointer to the application byte pool
+  * @retval Pointer to TX_BYTE_POOL
+  */
+TX_BYTE_POOL* get_app_byte_pool(void)
+{
+#if (USE_STATIC_ALLOCATION == 1)
+  return &tx_app_byte_pool;
+#else
+  return NULL;
+#endif
+}
 
 /* USER CODE END PFP */
 

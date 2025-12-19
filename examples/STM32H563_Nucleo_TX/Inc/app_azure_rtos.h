@@ -54,7 +54,7 @@ extern "C" {
 /* Exported functions prototypes ---------------------------------------------*/
 
 /* USER CODE BEGIN EFP */
-
+TX_BYTE_POOL* get_app_byte_pool(void);
 /* USER CODE END EFP */
 
 /* Private defines -----------------------------------------------------------*/
