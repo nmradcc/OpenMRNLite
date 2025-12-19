@@ -42,11 +42,7 @@
 #include <fcntl.h>
 
 #include "executor/StateFlow.hxx"
-#ifdef __FreeRTOS__
-#include "freertos/can_ioctl.h"
-#else
 #include "can_ioctl.h"
-#endif
 #include "utils/Hub.hxx"
 
 #ifdef __FreeRTOS__
