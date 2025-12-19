@@ -39,6 +39,16 @@ add_executable(${CMAKE_PROJECT_NAME})
 # Add STM32CubeMX generated sources
 add_subdirectory(cmake/stm32cubemx)
 
+# Add OpenMRNLite library
+set(OPENMRN_RTOS "FreeRTOS" CACHE STRING "Select RTOS" FORCE)
+add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/../.. ${CMAKE_CURRENT_BINARY_DIR}/openmrn)
+
+target_include_directories(OpenMRNLite PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/Inc
+    Middlewares/Third_Party/FreeRTOS/Source/include
+    Middlewares/Third_Party/FreeRTOS/Source/portable/GCC/ARM_CM33_NTZ/non_secure
+    )
+
 # Link directories setup
 target_link_directories(${CMAKE_PROJECT_NAME} PRIVATE
     # Add user defined library search paths
@@ -47,11 +57,15 @@ target_link_directories(${CMAKE_PROJECT_NAME} PRIVATE
 # Add sources to executable
 target_sources(${CMAKE_PROJECT_NAME} PRIVATE
     # Add user sources here
+    Src/OpenMRNLite_client.cpp
+    Src/OpenMRNLite_server.cpp
 )
 
 # Add include paths
 target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE
     # Add user defined include paths
+    Inc
+    Middlewares/Third_Party/FreeRTOS/Source/include
 )
 
 # Add project symbols (macros)
@@ -65,6 +79,7 @@ list(REMOVE_ITEM CMAKE_C_IMPLICIT_LINK_LIBRARIES ob)
 # Add linked libraries
 target_link_libraries(${CMAKE_PROJECT_NAME}
     stm32cubemx
+    OpenMRNLite
 
     # Add user defined libraries
 )
