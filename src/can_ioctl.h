@@ -35,9 +35,7 @@
 #define _FREERTOS_CAN_IOCTL_H_
 
 #include <stdint.h>
-#ifdef __FreeRTOS__
-#include "freertos/stropts.h"
-#endif
+#include "stropts.h"
 
 #if defined (__cplusplus)
 extern "C" {
