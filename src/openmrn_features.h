@@ -42,9 +42,9 @@
 
 #if defined(__FreeRTOS__)
 /// Compiles the FreeRTOS event group based ::select() implementation.
-#define OPENMRN_FEATURE_DEVICE_SELECT 1
+#define OPENMRN_FEATURE_DEVICE_SELECT 0 // Disabled for now
 /// Adds implementations for ::read ::write etc, with fd table.
-#define OPENMRN_FEATURE_DEVTAB 1
+#define OPENMRN_FEATURE_DEVTAB 0 // Disabled for now
 /// Adds struct reent pointer to the FreeRTOS Task Priv structure and swaps it
 /// in when the tasks are swapped in.
 #define OPENMRN_FEATURE_REENT 1
