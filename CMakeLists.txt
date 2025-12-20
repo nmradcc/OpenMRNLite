@@ -13,8 +13,8 @@ option(BUILD_EXAMPLES "Build example applications" OFF)
 option(BUILD_SHARED_LIBS "Build shared libraries" OFF)
 
 # RTOS Selection (only one should be enabled)
-set(OPENMRN_RTOS "FreeRTOS" CACHE STRING "Select RTOS: FreeRTOS, ThreadX, or CMSIS_RTOS_V2")
-set_property(CACHE OPENMRN_RTOS PROPERTY STRINGS "FreeRTOS" "ThreadX" "CMSIS_RTOS_V2")
+set(OPENMRN_RTOS "FreeRTOS" CACHE STRING "Select RTOS: FreeRTOS, ThreadX, CMSIS_RTOS_V2, or None")
+set_property(CACHE OPENMRN_RTOS PROPERTY STRINGS "FreeRTOS" "ThreadX" "CMSIS_RTOS_V2" "None")
 
 # Set default build type if not specified
 if(NOT CMAKE_BUILD_TYPE)
@@ -67,8 +67,12 @@ if(OPENMRN_RTOS STREQUAL "ThreadX")
 elseif(OPENMRN_RTOS STREQUAL "CMSIS_RTOS_V2")
     file(GLOB OS_SOURCES src/os/*.cpp src/os/cmsis_rtos2_impl.c)
     list(FILTER OS_SOURCES EXCLUDE REGEX ".*/(MDNS|OSSelectWakeup|OS)\\.cpp$")
+elseif(OPENMRN_RTOS STREQUAL "None")
+    # No RTOS - minimal OS layer
+    file(GLOB OS_SOURCES src/os/*.cpp src/os/os.c)
+    list(FILTER OS_SOURCES EXCLUDE REGEX ".*/(MDNS|OSSelectWakeup|OS)\\.cpp$")
 else() # FreeRTOS (default)
-    file(GLOB OS_SOURCES src/os/*.cpp)
+    file(GLOB OS_SOURCES src/os/*.cpp src/os/freertos_impl.c)
 endif()
 
 list(APPEND OPENMRNLITE_SOURCES ${OS_SOURCES})
@@ -151,9 +155,15 @@ elseif(OPENMRN_RTOS STREQUAL "CMSIS_RTOS_V2")
             target_compile_definitions(OpenMRNLite PRIVATE ${STM32CUBEMX_DEFINES})
         endif()
     endif()
+elseif(OPENMRN_RTOS STREQUAL "None")
+    target_compile_definitions(OpenMRNLite PUBLIC
+        OPENMRN_FEATURE_MUTEX_FAKE=1
+        OPENMRN_FEATURE_SINGLE_THREADED=1
+    )
+    message(STATUS "RTOS: None (single-threaded/bare-metal)")
 else() # FreeRTOS (default)
     target_compile_definitions(OpenMRNLite PUBLIC
-        OPENMRN_FEATURE_RTOS_FREERTOS=1
+        OPENMRN_FEATURE_MUTEX_FREERTOS=1
         __FreeRTOS__=1
     )
     message(STATUS "RTOS: FreeRTOS (default)")
