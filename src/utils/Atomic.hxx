@@ -73,7 +73,7 @@ public:
 
 #elif defined(__FreeRTOS__)
 
-#include "freertos_includes.h"
+#include "rtos_includes.h"
 
 /// Lightweight locking class for protecting small critical sections.
 ///

@@ -59,8 +59,8 @@ static TX_BYTE_POOL tx_app_byte_pool;
 
 /* Private function prototypes -----------------------------------------------*/
 /* USER CODE BEGIN PFP */
-//TX_BYTE_POOL* get_app_byte_pool(void);
 
+/// TODO: move to threadx OpenMRN os port file?
 /**
   * @brief  Get pointer to the application byte pool
   * @retval Pointer to TX_BYTE_POOL
@@ -73,6 +73,39 @@ TX_BYTE_POOL* get_app_byte_pool(void)
   return NULL;
 #endif
 }
+
+/// from OpenMRN:
+/// malloc implementation used for allocating buffer space. Override the weak
+/// definition if the buffer space should be allocated from some other place
+/// than the heap. Useful for MCUs with multiple memory banks.
+/// @param length how much memory to allocate (in bytes)
+/// @return pointer to allcoated memory
+
+/**
+  * @brief  Allocate memory from ThreadX byte pool
+  * @param  size: Size of memory to allocate
+  * @retval Pointer to allocated memory or NULL on failure
+  */
+void *buffer_malloc(size_t size)
+{
+    VOID *memory_ptr = NULL;
+    TX_BYTE_POOL *pool = get_app_byte_pool();
+    
+    if (pool == NULL)
+    {
+        return NULL;
+    }
+    
+    UINT status = tx_byte_allocate(pool, &memory_ptr, size, TX_NO_WAIT);
+    
+    if (status != TX_SUCCESS)
+    {
+        return NULL;
+    }
+    
+    return memory_ptr;
+}
+
 
 /* USER CODE END PFP */
 

@@ -127,9 +127,8 @@ Each RTOS may have different tick rates. The `NSEC_TO_TICK()` macro handles conv
 
 If you're porting existing FreeRTOS code:
 
-1. Replace `#include "freertos_includes.h"` with `#include "rtos_includes.h"` (or keep using freertos_includes.h as it now redirects)
-2. Use `os_*` functions instead of direct RTOS calls where possible
-3. Test thoroughly as timing and priority behavior may differ between RTOS implementations
+1. Use `os_*` functions instead of direct RTOS calls where possible
+2. Test thoroughly as timing and priority behavior may differ between RTOS implementations
 
 ## Troubleshooting
 

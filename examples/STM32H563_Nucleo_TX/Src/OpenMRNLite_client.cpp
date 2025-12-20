@@ -10,7 +10,7 @@
 /// assigned to the developer (get a range assigned to you via openlcb.org).
 static constexpr uint64_t NODE_ID = UINT64_C(0x050101011824);
 
-//OpenMRN openmrn(NODE_ID);
+OpenMRN openmrn(NODE_ID);
 
 namespace openlcb
 {
@@ -29,32 +29,8 @@ extern const char *const SNIP_DYNAMIC_FILENAME = nullptr;
 } // namespace openlcb
 
 extern "C" {
-
-// buffer_malloc - allocates memory from ThreadX byte pool
-void *buffer_malloc(size_t size)
-{
-    VOID *memory_ptr = NULL;
-    TX_BYTE_POOL *pool = get_app_byte_pool();
-    
-    if (pool == NULL)
-    {
-        return NULL;
-    }
-    
-    UINT status = tx_byte_allocate(pool, &memory_ptr, size, TX_NO_WAIT);
-    
-    if (status != TX_SUCCESS)
-    {
-        return NULL;
-    }
-    
-    return memory_ptr;
-}
-
 void OpenMRNLite_client_Entry(ULONG thread_input)
 {
-    // Initialize OpenMRNLite here
-    OpenMRN openmrn(NODE_ID);    
     while (1)
     {
         openmrn.loop();

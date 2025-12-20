@@ -51,7 +51,7 @@
     // ThreadX tick conversion (assuming 1000Hz = 1ms tick rate)
     #define NSEC_TO_TICK(ns) (((ns) * TX_TIMER_TICKS_PER_SECOND) / 1000000000ULL)
 
-#elif defined(OPENMRN_FEATURE_RTOS_CMSIS_V2)
+#elif defined(OPENMRN_FEATURE_RTOS_CMSIS_V2) || defined(__CMSIS_OS2_H)
     #define USING_CMSIS_RTOS_V2 1
     #include "cmsis_os2.h"
     // CMSIS-RTOS v2 tick conversion

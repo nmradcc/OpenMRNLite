@@ -37,7 +37,7 @@
 #ifdef OPENMRN_FEATURE_THREAD_FREERTOS
 
 #include "os/os.h"
-#include "freertos_includes.h"
+#include "rtos_includes.h"
 
 extern "C"
 {
