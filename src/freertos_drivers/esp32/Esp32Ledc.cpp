@@ -1,10 +1,10 @@
 /** \copyright
- * Copyright (c) 2025
+ * Copyright (c) 2021, Mike Dunston
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are  permitted provided that the following conditions are met:
- * 
+ *
  *  - Redistributions of source code must retain the above copyright notice,
  *    this list of conditions and the following disclaimer.
  *
@@ -24,41 +24,25 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  *
- * \file rtos_includes.h
- * This file simplifies the include path for RTOS header files and provides
- * unified abstractions for FreeRTOS, ThreadX, and CMSIS-RTOS v2.
+ * \file Esp32Ledc.cxx
  *
- * @date 17 December 2025
+ * ESP-IDF LEDC adapter that exposes a PWM interface.
+ *
+ * @author Mike Dunston
+ * @date 1 June 2021
  */
 
-#ifndef _RTOS_INCLUDES_H_
-#define _RTOS_INCLUDES_H_
+// Ensure we only compile this code for the ESP32 family of MCUs.
+#if defined(ESP_PLATFORM)
 
-#include "openmrn_features.h"
+#include "Esp32Ledc.hxx"
+#include <pthread.h>
 
-// Detect which RTOS is being used
-#if defined(OPENMRN_FEATURE_RTOS_FREERTOS)
-    #define USING_FREERTOS 1
-    #include <freertos/FreeRTOS.h>
-    #include <freertos/task.h>
-    #include <freertos/semphr.h>
-    #include <freertos/queue.h>
-    #define NSEC_TO_TICK(ns) ((ns) >> NSEC_TO_TICK_SHIFT)
+namespace openmrn_arduino
+{
 
-#elif defined(OPENMRN_FEATURE_RTOS_THREADX)
-    #define USING_THREADX 1
-    #include "tx_api.h"
-    // ThreadX tick conversion (assuming 1000Hz = 1ms tick rate)
-    #define NSEC_TO_TICK(ns) (((ns) * TX_TIMER_TICKS_PER_SECOND) / 1000000000ULL)
+pthread_once_t Esp32Ledc::ledcFadeOnce_ = PTHREAD_ONCE_INIT;
 
-#elif defined(OPENMRN_FEATURE_RTOS_CMSIS_V2)
-    #define USING_CMSIS_RTOS_V2 1
-    #include "cmsis_os2.h"
-    // CMSIS-RTOS v2 tick conversion
-    #define NSEC_TO_TICK(ns) (((ns) * osKernelGetTickFreq()) / 1000000000ULL)
+} // namespace openmrn_arduino
 
-#else
-    #error "No RTOS selected. Define OPENMRN_FEATURE_RTOS_FREERTOS, OPENMRN_FEATURE_RTOS_THREADX, or OPENMRN_FEATURE_RTOS_CMSIS_V2"
-#endif
-
-#endif // _RTOS_INCLUDES_H_
+#endif // ESP_PLATFORM

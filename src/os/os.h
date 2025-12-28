@@ -48,16 +48,11 @@
 #include <event_groups.h>
 #endif
 
-#if OPENMRN_FEATURE_MUTEX_PTHREAD
-#include <pthread.h>
-#include <semaphore.h>
-#endif
-
-#if defined(OPENMRN_FEATURE_MUTEX_FREERTOS) || defined(OPENMRN_FEATURE_RTOS_THREADX) || defined(OPENMRN_FEATURE_RTOS_CMSIS_V2)
+#if defined(OPENMRN_FEATURE_RTOS_FREERTOS) || defined(OPENMRN_FEATURE_RTOS_THREADX) || defined(OPENMRN_FEATURE_RTOS_CMSIS_V2)
 #include "rtos_includes.h"
 #endif
 
-#if defined(OPENMRN_FEATURE_MUTEX_FREERTOS)
+#if defined(OPENMRN_FEATURE_RTOS_FREERTOS)
 #include "os/freertos_impl.h"
 #elif defined(OPENMRN_FEATURE_RTOS_THREADX)
 #include "os/threadx_impl.h"
@@ -98,13 +93,7 @@ extern const size_t main_stack_size;
 extern const int main_priority;
 #endif
 
-#if OPENMRN_FEATURE_MUTEX_FREERTOS
-// Type definitions are in freertos_impl.h
-#elif defined(OPENMRN_FEATURE_RTOS_THREADX)
-// Type definitions are in threadx_impl.h
-#elif defined(OPENMRN_FEATURE_RTOS_CMSIS_V2)
-// Type definitions are in cmsis_rtos2_impl.h
-#elif OPENMRN_FEATURE_MUTEX_FAKE
+#if OPENMRN_FEATURE_MUTEX_FAKE
 // Used for single-threaded environments
 typedef struct {
     int locked;
@@ -120,22 +109,210 @@ typedef struct {
 
 typedef unsigned os_thread_t;
 typedef void *os_mq_t; /**< message queue handle */
-#endif
-#if OPENMRN_FEATURE_MUTEX_PTHREAD
-typedef pthread_t os_thread_t; /**< thread handle */
-typedef pthread_mutex_t os_mutex_t; /**< mutex handle */
-typedef void *os_mq_t; /**< message queue handle */
-typedef pthread_once_t os_thread_once_t; /**< one time initialization type */
-/** Some Operating Systems do not support timeouts with semaphores */
-typedef struct
+
+/** Private data structure for a queue, do not use directly */
+typedef struct queue_priv
 {
-    /// Condition variable.
-    pthread_cond_t cond;
-    /// Mutex protectin the counter
-    pthread_mutex_t mutex;
-    /// How many counts doe the semaphore store.
-    int counter;
-} os_sem_t;
+    os_sem_t semSend; /**< able to send semaphore */
+    os_sem_t semReceive; /**< able to receive semaphore */
+    char *buffer; /**< queue data */
+    size_t itemSize; /**< size of each item in the queue */
+    size_t bytes; /**< number of bytes that make up the queue */
+    unsigned int indexSend; /**< current index for send */
+    unsigned int indexReceive; /**< current index for receive */
+    os_mutex_t mutex; /**< mutex to protect queue operations */
+} QueuePriv;
+
+/** Static initializer for mutexes */
+#define OS_MUTEX_INITIALIZER {0, 0}
+/** Static initializer for recursive mutexes */
+#define OS_RECURSIVE_MUTEX_INITIALIZER {0, 1}
+
+// Inline function implementations for fake mutex (single-threaded)
+static inline os_thread_t os_thread_self(void)
+{
+    return 0xdeadbeef;
+}
+
+static inline int os_thread_get_priority(os_thread_t thread)
+{
+    return 2;
+}
+
+static inline int os_thread_get_priority_min(void)
+{
+    return 2;
+}
+
+static inline int os_thread_get_priority_max(void)
+{
+    return 2;
+}
+
+static inline int os_mutex_init(os_mutex_t *mutex)
+{
+    mutex->locked = 0;
+    mutex->recursive = 0;
+    return 0;
+}
+
+static inline int os_recursive_mutex_init(os_mutex_t *mutex)
+{
+    mutex->locked = 0;
+    mutex->recursive = 1;
+    return 0;
+}
+
+static inline int os_mutex_destroy(os_mutex_t *mutex)
+{
+    mutex->locked = 0;
+    return 0;
+}
+
+static inline int os_mutex_lock(os_mutex_t *mutex)
+{
+    if (mutex->locked && !mutex->recursive)
+    {
+        DIE("Mutex deadlock.");
+    }
+    mutex->locked++;
+    return 0;
+}
+
+static inline int os_mutex_unlock(os_mutex_t *mutex)
+{
+    if (mutex->locked <= 0)
+    {
+        DIE("Unlocking a not locked mutex");
+    }
+    --mutex->locked;
+    return 0;
+}
+
+static inline int os_sem_init(os_sem_t *sem, unsigned int value)
+{
+    sem->counter = value;
+    return 0;
+}
+
+static inline int os_sem_destroy(os_sem_t *sem)
+{
+    return 0;
+}
+
+static inline int os_sem_post(os_sem_t *sem)
+{
+    sem->counter++;
+    return 0;
+}
+
+static inline int os_sem_wait(os_sem_t *sem)
+{
+    if (!sem->counter) {
+        DIE("Semaphore deadlock.");
+    }
+    --sem->counter;
+    return 0;
+}
+
+static inline os_mq_t os_mq_create(size_t length, size_t item_size)
+{
+    QueuePriv *q = (QueuePriv*)malloc(sizeof(QueuePriv));
+    if (!q)
+    {
+        errno = ENOMEM;
+        return NULL;
+    }
+    os_sem_init(&q->semSend, length);
+    os_sem_init(&q->semReceive, 0);
+    q->buffer = (char*)malloc(length * item_size);
+    q->itemSize = item_size;
+    q->bytes = length * item_size;
+    q->indexSend = 0;
+    q->indexReceive = 0;
+    os_mutex_init(&q->mutex);
+    return q;
+}
+
+static inline void os_mq_send(os_mq_t queue, const void *data)
+{
+    QueuePriv *q = (QueuePriv*)queue;
+    
+    os_sem_wait(&q->semSend);
+    os_mutex_lock(&q->mutex);
+    memcpy(q->buffer + q->indexSend, data, q->itemSize);
+    q->indexSend += q->itemSize;
+    if (q->indexSend >= q->bytes)
+    {
+        q->indexSend = 0;
+    }
+    os_mutex_unlock(&q->mutex);
+    os_sem_post(&q->semReceive);
+}
+
+static inline void os_mq_receive(os_mq_t queue, void *data)
+{
+    QueuePriv *q = (QueuePriv*)queue;
+    
+    os_sem_wait(&q->semReceive);
+    os_mutex_lock(&q->mutex);
+    memcpy(data, q->buffer + q->indexReceive, q->itemSize);
+    q->indexReceive += q->itemSize;
+    if (q->indexReceive >= q->bytes)
+    {
+        q->indexReceive = 0;
+    }
+    os_mutex_unlock(&q->mutex);
+    os_sem_post(&q->semSend);
+}
+
+static inline int os_mq_timedsend(os_mq_t queue, const void *data, long long timeout)
+{
+    DIE("unimplemented.");
+    return OS_MQ_NONE;
+}
+
+static inline int os_mq_timedreceive(os_mq_t queue, void *data, long long timeout)
+{
+    DIE("unimplemented.");
+    return OS_MQ_NONE;
+}
+
+static inline int os_mq_send_from_isr(os_mq_t queue, const void *data, int *woken)
+{
+    DIE("unimplemented.");
+    return OS_MQ_NONE;
+}
+
+static inline int os_mq_is_full_from_isr(os_mq_t queue)
+{
+    DIE("unimplemented.");
+    return 1;
+}
+
+static inline int os_mq_receive_from_isr(os_mq_t queue, void *data, int *woken)
+{
+    DIE("unimplemented.");
+    return OS_MQ_NONE;
+}
+
+static inline int os_mq_num_pending(os_mq_t queue)
+{
+    DIE("unimplemented.");
+    return 0;
+}
+
+static inline int os_mq_num_pending_from_isr(os_mq_t queue)
+{
+    DIE("unimplemented.");
+    return 0;
+}
+
+static inline int os_mq_num_spaces(os_mq_t queue)
+{
+    DIE("unimplemented.");
+    return 0;
+}
 #endif
 
 #ifndef container_of
@@ -162,7 +339,6 @@ extern long long os_get_time_monotonic(void);
  */
 extern long long os_get_fake_time(void);
 
-#ifndef OPENMRN_FEATURE_MUTEX_PTHREAD
 /** @ref os_thread_once states.
  */
 enum
@@ -173,29 +349,13 @@ enum
 };
 /** initial value for one time intitialization instance */
 #define OS_THREAD_ONCE_INIT { OS_THREAD_ONCE_NEVER }
-#else
-/** initial value for one time intitialization instance */
-#define OS_THREAD_ONCE_INIT PTHREAD_ONCE_INIT
-#endif
 
-#ifndef OPENMRN_FEATURE_MUTEX_PTHREAD
 /** One time intialization routine
  * @param once one time instance
  * @param routine method to call once
  * @return 0 upon success
  */
 int os_thread_once(os_thread_once_t *once, void (*routine)(void));
-#else
-/** One time intialization routine
- * @param once one time instance
- * @param routine method to call once
- * @return 0 upon success
- */
-OS_INLINE int os_thread_once(os_thread_once_t *once, void (*routine)(void))
-{
-    return pthread_once(once, routine);
-}
-#endif
 
 #define OS_PRIO_MIN 1 /**< lowest thread priority supported by abstraction */
 #define OS_PRIO_DEFAULT 0 /**< default thread priority */
@@ -360,295 +520,72 @@ void os_thread_cancel(os_thread_t thread);
 /** Return a handle to the calling thread.
  * @return a handle to the calling thread
  */
-OS_INLINE os_thread_t os_thread_self(void)
-{
-#if OPENMRN_FEATURE_MUTEX_FREERTOS
-    extern os_thread_t os_thread_self_freertos(void);
-    return os_thread_self_freertos();
-#elif defined(OPENMRN_FEATURE_RTOS_THREADX)
-    extern os_thread_t os_thread_self_threadx(void);
-    return os_thread_self_threadx();
-#elif OPENMRN_FEATURE_MUTEX_FAKE || OPENMRN_FEATURE_SINGLE_THREADED
-    return 0xdeadbeef;
-#elif OPENMRN_FEATURE_MUTEX_PTHREAD
-    return pthread_self();
-#endif
-}
+OS_INLINE os_thread_t os_thread_self(void);
 
 /** Return the current thread priority.
  * @param thread handle to thread of interest
  * @return current thread priority
  */
-OS_INLINE int os_thread_get_priority(os_thread_t thread)
-{
-#if OPENMRN_FEATURE_MUTEX_FREERTOS
-    extern int os_thread_get_priority_freertos(os_thread_t thread);
-    return os_thread_get_priority_freertos(thread);
-#elif defined(OPENMRN_FEATURE_RTOS_THREADX)
-    UINT priority;
-    UINT status = tx_thread_info_get(thread, NULL, NULL, NULL, &priority, NULL, NULL, NULL, NULL);
-    return (status == TX_SUCCESS) ? priority : 16;
-#elif OPENMRN_FEATURE_MUTEX_FAKE || OPENMRN_FEATURE_SINGLE_THREADED
-    return 2;
-#elif OPENMRN_FEATURE_MUTEX_PTHREAD
-    struct sched_param params;
-    int policy;
-    pthread_getschedparam(thread, &policy, &params);
-    return params.sched_priority;
-#endif
-}
+OS_INLINE int os_thread_get_priority(os_thread_t thread);
 
 /** Get the minimum thread priority.
  * @return minimum trhead priority
  */
-OS_INLINE int os_thread_get_priority_min(void)
-{
-#if OPENMRN_FEATURE_MUTEX_FREERTOS
-    extern int os_thread_get_priority_min_freertos(void);
-    return os_thread_get_priority_min_freertos();
-#elif defined(OPENMRN_FEATURE_RTOS_THREADX)
-    return 0; // ThreadX priority 0 is highest
-#elif OPENMRN_FEATURE_MUTEX_FAKE || OPENMRN_FEATURE_SINGLE_THREADED
-    return 2;
-#elif OPENMRN_FEATURE_MUTEX_PTHREAD
-    return sched_get_priority_min(SCHED_FIFO);
-#endif
-}
+OS_INLINE int os_thread_get_priority_min(void);
 
 /** Get the maximum thread priority.
  * @return maximum trhead priority
  */
-OS_INLINE int os_thread_get_priority_max(void)
-{
-#if OPENMRN_FEATURE_MUTEX_FREERTOS
-    extern int os_thread_get_priority_max_freertos(void);
-    return os_thread_get_priority_max_freertos();
-#elif defined(OPENMRN_FEATURE_RTOS_THREADX)
-    return 31; // ThreadX priority 31 is lowest
-#elif OPENMRN_FEATURE_MUTEX_FAKE || OPENMRN_FEATURE_SINGLE_THREADED
-    return 2;
-#elif OPENMRN_FEATURE_MUTEX_PTHREAD
-    return sched_get_priority_max(SCHED_FIFO);
-#endif
-}
-
-#if OPENMRN_FEATURE_MUTEX_FREERTOS
-/** Static initializer for mutexes */
-#define OS_MUTEX_INITIALIZER {NULL, 0}
-/** Static initializer for recursive mutexes */
-#define OS_RECURSIVE_MUTEX_INITIALIZER {NULL, 1}
-#elif defined(OPENMRN_FEATURE_RTOS_THREADX)
-/** Static initializer for mutexes (ThreadX mutexes must be initialized at runtime) */
-#define OS_MUTEX_INITIALIZER {{0}, 0}
-/** Static initializer for recursive mutexes (ThreadX mutexes must be initialized at runtime) */
-#define OS_RECURSIVE_MUTEX_INITIALIZER {{0}, 1}
-#elif OPENMRN_FEATURE_MUTEX_FAKE
-/** Static initializer for mutexes */
-#define OS_MUTEX_INITIALIZER {0, 0}
-/** Static initializer for recursive mutexes */
-#define OS_RECURSIVE_MUTEX_INITIALIZER {0, 1}
-#elif OPENMRN_FEATURE_MUTEX_PTHREAD
-/** Static initializer for mutexes */
-#define OS_MUTEX_INITIALIZER PTHREAD_MUTEX_INITIALIZER
-
-/** Static initializer for recursive mutexes */
-#define OS_RECURSIVE_MUTEX_INITIALIZER PTHREAD_RECURSIVE_MUTEX_INITIALIZER_NP
-#endif
+OS_INLINE int os_thread_get_priority_max(void);
 
 /** Initialize mutex.
  * @param mutex address of mutex handle to initialize
  * @return 0 upon succes or error number upon failure
  */
-OS_INLINE int os_mutex_init(os_mutex_t *mutex)
-{
-#if OPENMRN_FEATURE_MUTEX_FREERTOS
-    extern int os_mutex_init_freertos(os_mutex_t *mutex);
-    return os_mutex_init_freertos(mutex);
-#elif defined(OPENMRN_FEATURE_RTOS_THREADX)
-    extern int os_mutex_init_threadx(os_mutex_t *mutex);
-    return os_mutex_init_threadx(mutex);
-#elif OPENMRN_FEATURE_MUTEX_FAKE
-    mutex->locked = 0;
-    mutex->recursive = 0;
-    return 0;
-#elif OPENMRN_FEATURE_MUTEX_PTHREAD
-    return pthread_mutex_init(mutex, NULL);
-#endif
-}
+OS_INLINE int os_mutex_init(os_mutex_t *mutex);
 
 /** Initialize recursive mutex.
  * @param mutex address of mutex handle to initialize
  * @return 0 upon succes or error number upon failure
  */
-OS_INLINE int os_recursive_mutex_init(os_mutex_t *mutex)
-{
-#if OPENMRN_FEATURE_MUTEX_FREERTOS
-    extern int os_recursive_mutex_init_freertos(os_mutex_t *mutex);
-    return os_recursive_mutex_init_freertos(mutex);
-#elif defined(OPENMRN_FEATURE_RTOS_THREADX)
-    // ThreadX mutexes are inherently recursive
-    extern int os_mutex_init_threadx(os_mutex_t *mutex);
-    return os_mutex_init_threadx(mutex);
-#elif OPENMRN_FEATURE_MUTEX_FAKE
-    mutex->locked = 0;
-    mutex->recursive = 1;
-    return 0;
-#elif OPENMRN_FEATURE_MUTEX_PTHREAD
-    pthread_mutexattr_t attr;
-    int result;
-
-    result = pthread_mutexattr_init(&attr);
-    if (result != 0)
-    {
-        return result;
-    }
-
-    result = pthread_mutexattr_settype(&attr, PTHREAD_MUTEX_RECURSIVE);
-    if (result != 0)
-    {
-        return result;
-    }
-
-    return pthread_mutex_init(mutex, &attr);
-#endif
-}
+OS_INLINE int os_recursive_mutex_init(os_mutex_t *mutex);
 
 /** Destroy a mutex.
  * @param mutex address of mutex handle to destroy
  * @return 0 upon succes or error number upon failure
  */
-OS_INLINE int os_mutex_destroy(os_mutex_t *mutex)
-{
-#if OPENMRN_FEATURE_MUTEX_FREERTOS
-    extern int os_mutex_destroy_freertos(os_mutex_t *mutex);
-    return os_mutex_destroy_freertos(mutex);
-#elif defined(OPENMRN_FEATURE_RTOS_THREADX)
-    extern int os_mutex_destroy_threadx(os_mutex_t *mutex);
-    return os_mutex_destroy_threadx(mutex);
-#elif OPENMRN_FEATURE_MUTEX_FAKE
-    mutex->locked = 0;
-    return 0;
-#elif OPENMRN_FEATURE_MUTEX_PTHREAD
-    return pthread_mutex_destroy(mutex);
-#endif
-}
+OS_INLINE int os_mutex_destroy(os_mutex_t *mutex);
 
 /** Lock a mutex.
  * @param mutex address of mutex handle to lock
  * @return 0 upon succes or error number upon failure
  */
-OS_INLINE int os_mutex_lock(os_mutex_t *mutex)
-{
-#if OPENMRN_FEATURE_MUTEX_FREERTOS
-    extern int os_mutex_lock_freertos(os_mutex_t *mutex);
-    return os_mutex_lock_freertos(mutex);
-#elif defined(OPENMRN_FEATURE_RTOS_THREADX)
-    extern int os_mutex_lock_threadx(os_mutex_t *mutex);
-    return os_mutex_lock_threadx(mutex);
-#elif OPENMRN_FEATURE_MUTEX_FAKE
-    if (mutex->locked && !mutex->recursive)
-    {
-        DIE("Mutex deadlock.");
-    }
-    mutex->locked++;
-    return 0;
-#elif OPENMRN_FEATURE_MUTEX_PTHREAD
-    return pthread_mutex_lock(mutex);
-#endif
-}
+OS_INLINE int os_mutex_lock(os_mutex_t *mutex);
 
-/** Unock a mutex.
+/** Unlock a mutex.
  * @param mutex address of mutex handle to unlock
  * @return 0 upon succes or error number upon failure
  */
-OS_INLINE int os_mutex_unlock(os_mutex_t *mutex)
-{
-#if OPENMRN_FEATURE_MUTEX_FREERTOS
-    extern int os_mutex_unlock_freertos(os_mutex_t *mutex);
-    return os_mutex_unlock_freertos(mutex);
-#elif defined(OPENMRN_FEATURE_RTOS_THREADX)
-    extern int os_mutex_unlock_threadx(os_mutex_t *mutex);
-    return os_mutex_unlock_threadx(mutex);
-#elif OPENMRN_FEATURE_MUTEX_FAKE
-    if (mutex->locked <= 0)
-    {
-        DIE("Unlocking a not locked mutex");
-    }
-    --mutex->locked;
-    return 0;
-#elif OPENMRN_FEATURE_MUTEX_PTHREAD
-    return pthread_mutex_unlock(mutex);
-#endif
-}
+OS_INLINE int os_mutex_unlock(os_mutex_t *mutex);
 
 /** Initialize a semaphore.
  * @param sem address of semaphore to initialize
  * @param value initial value of semaphore
  * @return 0 upon success
  */
-OS_INLINE int os_sem_init(os_sem_t *sem, unsigned int value)
-{
-#if OPENMRN_FEATURE_MUTEX_FREERTOS
-    extern int os_sem_init_freertos(os_sem_t *sem, unsigned int value);
-    return os_sem_init_freertos(sem, value);
-#elif defined(OPENMRN_FEATURE_RTOS_THREADX)
-    extern int os_sem_init_threadx(os_sem_t *sem, unsigned int value);
-    return os_sem_init_threadx(sem, value);
-#elif OPENMRN_FEATURE_MUTEX_FAKE
-    sem->counter = value;
-    return 0;
-#elif OPENMRN_FEATURE_MUTEX_PTHREAD
-    pthread_cond_init(&sem->cond, NULL);
-    pthread_mutex_init(&sem->mutex, NULL);
-    sem->counter = value;
-    return 0;
-#endif
-}
+OS_INLINE int os_sem_init(os_sem_t *sem, unsigned int value);
 
 /** Destroy a semaphore.
  * @param sem address of semaphore to destroy
  * @return 0 upon success
  */
-OS_INLINE int os_sem_destroy(os_sem_t *sem)
-{
-#if OPENMRN_FEATURE_MUTEX_FREERTOS
-    extern int os_sem_destroy_freertos(os_sem_t *sem);
-    return os_sem_destroy_freertos(sem);
-#elif defined(OPENMRN_FEATURE_RTOS_THREADX)
-    UINT status = tx_semaphore_delete(&sem->sem);
-    return (status == TX_SUCCESS) ? 0 : -1;
-#elif OPENMRN_FEATURE_MUTEX_FAKE
-    return 0;
-#elif OPENMRN_FEATURE_MUTEX_PTHREAD
-    pthread_cond_destroy(&sem->cond);
-    pthread_mutex_destroy(&sem->mutex);
-    return 0;
-#endif
-}
+OS_INLINE int os_sem_destroy(os_sem_t *sem);
 
 /** Post a semaphore.
  * @param sem address of semaphore to increment
  * @return 0 upon success
  */
-OS_INLINE int os_sem_post(os_sem_t *sem)
-{
-#if OPENMRN_FEATURE_MUTEX_FREERTOS
-    extern int os_sem_post_freertos(os_sem_t *sem);
-    return os_sem_post_freertos(sem);
-#elif defined(OPENMRN_FEATURE_RTOS_THREADX)
-    extern int os_sem_post_threadx(os_sem_t *sem);
-    return os_sem_post_threadx(sem);
-#elif OPENMRN_FEATURE_MUTEX_FAKE
-    sem->counter++;
-    return 0;
-#elif OPENMRN_FEATURE_MUTEX_PTHREAD
-    pthread_mutex_lock(&sem->mutex);
-    sem->counter++;
-    pthread_cond_signal(&sem->cond);
-    pthread_mutex_unlock(&sem->mutex);
-    return 0;
-#endif
-}
+OS_INLINE int os_sem_post(os_sem_t *sem);
 
 #if OPENMRN_FEATURE_RTOS_FROM_ISR
 /** Post a semaphore from the ISR context.
@@ -656,48 +593,14 @@ OS_INLINE int os_sem_post(os_sem_t *sem)
  * @param woken is the task woken up
  * @return 0 upon success
  */
-OS_INLINE int os_sem_post_from_isr(os_sem_t *sem, int *woken)
-{
-#if OPENMRN_FEATURE_MUTEX_FREERTOS
-    extern int os_sem_post_from_isr_freertos(os_sem_t *sem, int *woken);
-    return os_sem_post_from_isr_freertos(sem, woken);
-#elif defined(OPENMRN_FEATURE_RTOS_THREADX)
-    // ThreadX: semaphore post is safe from ISR context
-    extern int os_sem_post_threadx(os_sem_t *sem);
-    return os_sem_post_threadx(sem);
-#endif
-}
+OS_INLINE int os_sem_post_from_isr(os_sem_t *sem, int *woken);
 #endif // OPENMRN_FEATURE_RTOS_FROM_ISR
 
 /** Wait on a semaphore.
  * @param sem address of semaphore to decrement
  * @return 0 upon success
  */
-OS_INLINE int os_sem_wait(os_sem_t *sem)
-{
-#if OPENMRN_FEATURE_MUTEX_FREERTOS
-    extern int os_sem_wait_freertos(os_sem_t *sem);
-    return os_sem_wait_freertos(sem);
-#elif defined(OPENMRN_FEATURE_RTOS_THREADX)
-    extern int os_sem_wait_threadx(os_sem_t *sem);
-    return os_sem_wait_threadx(sem);
-#elif OPENMRN_FEATURE_MUTEX_FAKE
-    if (!sem->counter) {
-        DIE("Semaphore deadlock.");
-    }
-    --sem->counter;
-    return 0;
-#elif OPENMRN_FEATURE_MUTEX_PTHREAD
-    pthread_mutex_lock(&sem->mutex);
-    while (sem->counter == 0)
-    {
-        pthread_cond_wait(&sem->cond, &sem->mutex);
-    }
-    sem->counter--;
-    pthread_mutex_unlock(&sem->mutex);
-    return 0;
-#endif
-}
+OS_INLINE int os_sem_wait(os_sem_t *sem);
 
 #if OPENMRN_FEATURE_SEM_TIMEDWAIT
 /** Wait on a semaphore with a timeout.
@@ -705,123 +608,21 @@ OS_INLINE int os_sem_wait(os_sem_t *sem)
  * @param timeout in nanoseconds, else OPENMRN_OS_WAIT_FOREVER to wait forever
  * @return 0 upon success, else -1 with errno set to indicate error
  */
-OS_INLINE int os_sem_timedwait(os_sem_t *sem, long long timeout)
-{
-    if (timeout == OPENMRN_OS_WAIT_FOREVER)
-    {
-        return os_sem_wait(sem);
-    }
-#if OPENMRN_FEATURE_MUTEX_FREERTOS
-    extern int os_sem_timedwait_freertos(os_sem_t *sem, long long timeout);
-    return os_sem_timedwait_freertos(sem, timeout);
-#elif defined(OPENMRN_FEATURE_RTOS_THREADX)
-    extern int os_sem_timedwait_threadx(os_sem_t *sem, long long timeout);
-    int result = os_sem_timedwait_threadx(sem, timeout);
-    if (result != 0) {
-        errno = ETIMEDOUT;
-    }
-    return result;
-#elif OPENMRN_FEATURE_MUTEX_PTHREAD
-    struct timeval tv;
-    struct timespec ts;
-    gettimeofday(&tv, NULL);
-    timeout += ((long long)tv.tv_sec * 1000000000LL) + ((long long) tv.tv_usec * 1000LL);
-    ts.tv_sec = timeout / 1000000000LL;
-    ts.tv_nsec = timeout % 1000000000LL;
-    pthread_mutex_lock(&sem->mutex);
-    while (sem->counter == 0)
-    {
-        if (pthread_cond_timedwait(&sem->cond, &sem->mutex, &ts) == ETIMEDOUT)
-        {
-            pthread_mutex_unlock(&sem->mutex);
-            errno = ETIMEDOUT;
-            return -1;
-        }
-    }
-    sem->counter--;
-    pthread_mutex_unlock(&sem->mutex);
-    return 0;
-#endif
-}
-
+OS_INLINE int os_sem_timedwait(os_sem_t *sem, long long timeout);
 #endif // OPENMRN_FEATURE_SEM_TIMEDWAIT
-
-
-#if !defined (OPENMRN_FEATURE_MUTEX_FREERTOS)
-/** Private data structure for a queue, do not use directly
- */
-typedef struct queue_priv
-{
-    os_sem_t semSend; /**< able to send semaphore */
-    os_sem_t semReceive; /**< able to receive semaphore */
-    char *buffer; /**< queue data */
-    size_t itemSize; /**< size of each item in the queue */
-    size_t bytes; /**< number of bytes that make up the queue */
-    unsigned int indexSend; /**< current index for send */
-    unsigned int indexReceive; /**< current index for receive */
-    os_mutex_t mutex; /**< mutex to protect queue operations */
-} QueuePriv;
-#endif
 
 /** Create a new message queue.
  * @param length length in number of messages of the queue
  * @param item_size size in number of bytes of a message
  * @return handle to the created queue, NULL on failure
  */
-OS_INLINE os_mq_t os_mq_create(size_t length, size_t item_size)
-{
-#if OPENMRN_FEATURE_MUTEX_FREERTOS
-    extern os_mq_t os_mq_create_freertos(size_t length, size_t item_size);
-    return os_mq_create_freertos(length, item_size);
-#elif defined(OPENMRN_FEATURE_RTOS_THREADX)
-    // ThreadX queues need to be created with actual implementation
-    extern TX_QUEUE* os_mq_create_threadx(size_t length, size_t item_size);
-    return os_mq_create_threadx(length, item_size);
-#else
-    QueuePriv *q = (QueuePriv*)malloc(sizeof(QueuePriv));
-    if (!q)
-    {
-        errno = ENOMEM;
-        return NULL;
-    }
-    os_sem_init(&q->semSend, length);
-    os_sem_init(&q->semReceive, 0);
-    q->buffer = (char*)malloc(length * item_size);
-    q->itemSize = item_size;
-    q->bytes = length * item_size;
-    q->indexSend = 0;
-    q->indexReceive = 0;
-    os_mutex_init(&q->mutex);
-
-    return q;
-#endif
-}
+OS_INLINE os_mq_t os_mq_create(size_t length, size_t item_size);
 
 /** Blocking send of a message to a queue.
  * @param queue queue to send message to
  * @param data message to copy into queue
  */
-OS_INLINE void os_mq_send(os_mq_t queue, const void *data)
-{
-#if OPENMRN_FEATURE_MUTEX_FREERTOS
-    extern void os_mq_send_freertos(os_mq_t queue, const void *data);
-    os_mq_send_freertos(queue, data);
-#else
-    QueuePriv *q = (QueuePriv*)queue;
-    
-    os_sem_wait(&q->semSend);
-
-    os_mutex_lock(&q->mutex);
-    memcpy(q->buffer + q->indexSend, data, q->itemSize);
-    q->indexSend += q->itemSize;
-    if (q->indexSend >= q->bytes)
-    {
-        q->indexSend = 0;
-    }
-    os_mutex_unlock(&q->mutex);
-    os_sem_post(&q->semReceive);
-#endif
-}
+OS_INLINE void os_mq_send(os_mq_t queue, const void *data);
 
 /** Send a message to a queue with a timeout.
  * @param queue queue to send message to
@@ -829,43 +630,13 @@ OS_INLINE void os_mq_send(os_mq_t queue, const void *data)
  * @param timeout time in nanoseconds to wait for queue to be able to accept message
  * @return OS_MQ_NONE on success, OS_MQ_TIMEDOUT on timeout
  */
-OS_INLINE int os_mq_timedsend(os_mq_t queue, const void *data, long long timeout)
-{
-#if OPENMRN_FEATURE_MUTEX_FREERTOS
-    extern int os_mq_timedsend_freertos(os_mq_t queue, const void *data, long long timeout);
-    return os_mq_timedsend_freertos(queue, data, timeout);
-#else
-    DIE("unimplemented.");
-    return OS_MQ_NONE;
-#endif
-}
-
+OS_INLINE int os_mq_timedsend(os_mq_t queue, const void *data, long long timeout);
 
 /** Blocking receive a message from a queue.
  * @param queue queue to receive message from
  * @param data location to copy message from the queue
  */
-OS_INLINE void os_mq_receive(os_mq_t queue, void *data)
-{
-#if OPENMRN_FEATURE_MUTEX_FREERTOS
-    extern void os_mq_receive_freertos(os_mq_t queue, void *data);
-    os_mq_receive_freertos(queue, data);
-#else
-    QueuePriv *q = (QueuePriv*)queue;
-    
-    os_sem_wait(&q->semReceive);
-
-    os_mutex_lock(&q->mutex);
-    memcpy(q->buffer + q->indexReceive, data, q->itemSize);
-    q->indexReceive += q->itemSize;
-    if (q->indexReceive >= q->bytes)
-    {
-        q->indexReceive = 0;
-    }
-    os_mutex_unlock(&q->mutex);
-    os_sem_post(&q->semSend);
-#endif
-}
+OS_INLINE void os_mq_receive(os_mq_t queue, void *data);
 
 /** Receive a message from a queue.
  * @param queue queue to receive message from
@@ -873,16 +644,7 @@ OS_INLINE void os_mq_receive(os_mq_t queue, void *data)
  * @param timeout time in nanoseconds to wait for queue to have a message available
  * @return OS_MQ_NONE on success, OS_MQ_TIMEDOUT on timeout
  */
-OS_INLINE int os_mq_timedreceive(os_mq_t queue, void *data, long long timeout)
-{
-#if OPENMRN_FEATURE_MUTEX_FREERTOS
-    extern int os_mq_timedreceive_freertos(os_mq_t queue, void *data, long long timeout);
-    return os_mq_timedreceive_freertos(queue, data, timeout);
-#else
-    DIE("unimplemented.");
-    return OS_MQ_NONE;
-#endif
-}
+OS_INLINE int os_mq_timedreceive(os_mq_t queue, void *data, long long timeout);
 
 /** Send of a message to a queue from ISR context.
  * @param queue queue to send message to
@@ -890,32 +652,13 @@ OS_INLINE int os_mq_timedreceive(os_mq_t queue, void *data, long long timeout)
  * @param woken is the task woken up
  * @return OS_MQ_NONE on success, else OS_MQ_FULL
  */
-OS_INLINE int os_mq_send_from_isr(os_mq_t queue, const void *data, int *woken)
-{
-#if OPENMRN_FEATURE_MUTEX_FREERTOS
-    extern int os_mq_send_from_isr_freertos(os_mq_t queue, const void *data, int *woken);
-    return os_mq_send_from_isr_freertos(queue, data, woken);
-#else
-    DIE("unimplemented.");
-    return OS_MQ_NONE;
-#endif
-}
+OS_INLINE int os_mq_send_from_isr(os_mq_t queue, const void *data, int *woken);
 
 /** Check if a queue is full from ISR context.
  * @param queue is the queue to check
  * @return non-zero if the queue is full.
  */
-OS_INLINE int os_mq_is_full_from_isr(os_mq_t queue)
-{
-#if OPENMRN_FEATURE_MUTEX_FREERTOS
-    extern int os_mq_is_full_from_isr_freertos(os_mq_t queue);
-    return os_mq_is_full_from_isr_freertos(queue);
-#else
-    DIE("unimplemented.");
-    return 1;
-#endif
-}
-
+OS_INLINE int os_mq_is_full_from_isr(os_mq_t queue);
 
 /** Receive a message from a queue from ISR context.
  * @param queue queue to receive message from
@@ -923,83 +666,29 @@ OS_INLINE int os_mq_is_full_from_isr(os_mq_t queue)
  * @param woken is the task woken up
  * @return OS_MQ_NONE on success, else OS_MQ_FULL
  */
-OS_INLINE int os_mq_receive_from_isr(os_mq_t queue, void *data, int *woken)
-{
-#if OPENMRN_FEATURE_MUTEX_FREERTOS
-    extern int os_mq_receive_from_isr_freertos(os_mq_t queue, void *data, int *woken);
-    return os_mq_receive_from_isr_freertos(queue, data, woken);
-#else
-    DIE("unimplemented.");
-    return OS_MQ_NONE;
-#endif
-}
+OS_INLINE int os_mq_receive_from_isr(os_mq_t queue, void *data, int *woken);
 
 /** Return the number of messages pending in the queue.
  * @param queue queue to check
  * @return number of messages in the queue
  */
-OS_INLINE int os_mq_num_pending(os_mq_t queue)
-{
-#if OPENMRN_FEATURE_MUTEX_FREERTOS
-    extern int os_mq_num_pending_freertos(os_mq_t queue);
-    return os_mq_num_pending_freertos(queue);
-#else
-    DIE("unimplemented.");
-    return 0;
-#endif
-}
+OS_INLINE int os_mq_num_pending(os_mq_t queue);
 
 /** Return the number of messages pending in the queue from ISR context.
  * @param queue queue to check
  * @return number of messages in the queue
  */
-OS_INLINE int os_mq_num_pending_from_isr(os_mq_t queue)
-{
-#if OPENMRN_FEATURE_MUTEX_FREERTOS
-    extern int os_mq_num_pending_from_isr_freertos(os_mq_t queue);
-    return os_mq_num_pending_from_isr_freertos(queue);
-#else
-    DIE("unimplemented.");
-    return 0;
-#endif
-}
+OS_INLINE int os_mq_num_pending_from_isr(os_mq_t queue);
 
 /** Return the number of spaces available in the queue.
  * @param queue queue to check
  * @return number of spaces available
  */
-OS_INLINE int os_mq_num_spaces(os_mq_t queue)
-{
-#if OPENMRN_FEATURE_MUTEX_FREERTOS
-    extern int os_mq_num_spaces_freertos(os_mq_t queue);
-    return os_mq_num_spaces_freertos(queue);
-#else
-    DIE("unimplemented.");
-    return 0;
-#endif
-}
+OS_INLINE int os_mq_num_spaces(os_mq_t queue);
 
-#if defined (__FreeRTOS__)
-/** Some of the older ports of FreeRTOS don't yet have this macro, so define it.
- */
-#if !defined (portEND_SWITCHING_ISR)
-#define portEND_SWITCHING_ISR(_woken) \
-    if( _woken )                      \
-    {                                 \
-        portYIELD_FROM_ISR();         \
-    }
-#endif
+// All inline function implementations are provided by the RTOS-specific impl.h files
+// which are included above based on the OPENMRN_FEATURE_RTOS_* macros
 
-/** Test if we have woken up a higher priority task as the end of an interrupt.
- * @param _woken test value
- */
-#define os_isr_exit_yield_test(_woken) \
-do                                     \
-{                                      \
-    portEND_SWITCHING_ISR(_woken);     \
-} while(0);
-
-#endif
 
 /** Get the monotonic time since the system started.
  * @return time in nanoseconds since system start

@@ -1,10 +1,10 @@
 /** \copyright
- * Copyright (c) 2025
+ * Copyright (c) 2021, Mike Dunston
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are  permitted provided that the following conditions are met:
- * 
+ *
  *  - Redistributions of source code must retain the above copyright notice,
  *    this list of conditions and the following disclaimer.
  *
@@ -24,41 +24,53 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  *
- * \file rtos_includes.h
- * This file simplifies the include path for RTOS header files and provides
- * unified abstractions for FreeRTOS, ThreadX, and CMSIS-RTOS v2.
+ * \file Esp32SocInfo.hxx
  *
- * @date 17 December 2025
+ * Utility class which provides details of the running ESP32 SoC.
+ *
+ * @author Mike Dunston
+ * @date 4 May 2021
  */
+#ifndef _FREERTOS_DRIVERS_ESP32_ESP32SOCINFO_HXX_
+#define _FREERTOS_DRIVERS_ESP32_ESP32SOCINFO_HXX_
 
-#ifndef _RTOS_INCLUDES_H_
-#define _RTOS_INCLUDES_H_
+#include <stdint.h>
 
-#include "openmrn_features.h"
+#if defined(ESP_PLATFORM)
 
-// Detect which RTOS is being used
-#if defined(OPENMRN_FEATURE_RTOS_FREERTOS)
-    #define USING_FREERTOS 1
-    #include <freertos/FreeRTOS.h>
-    #include <freertos/task.h>
-    #include <freertos/semphr.h>
-    #include <freertos/queue.h>
-    #define NSEC_TO_TICK(ns) ((ns) >> NSEC_TO_TICK_SHIFT)
+#include "sdkconfig.h"
 
-#elif defined(OPENMRN_FEATURE_RTOS_THREADX)
-    #define USING_THREADX 1
-    #include "tx_api.h"
-    // ThreadX tick conversion (assuming 1000Hz = 1ms tick rate)
-    #define NSEC_TO_TICK(ns) (((ns) * TX_TIMER_TICKS_PER_SECOND) / 1000000000ULL)
-
-#elif defined(OPENMRN_FEATURE_RTOS_CMSIS_V2)
-    #define USING_CMSIS_RTOS_V2 1
-    #include "cmsis_os2.h"
-    // CMSIS-RTOS v2 tick conversion
-    #define NSEC_TO_TICK(ns) (((ns) * osKernelGetTickFreq()) / 1000000000ULL)
-
-#else
-    #error "No RTOS selected. Define OPENMRN_FEATURE_RTOS_FREERTOS, OPENMRN_FEATURE_RTOS_THREADX, or OPENMRN_FEATURE_RTOS_CMSIS_V2"
+#if defined(CONFIG_IDF_TARGET_ESP32)
+#include <esp32/rom/rtc.h>
+#elif defined(CONFIG_IDF_TARGET_ESP32S2)
+#include <esp32s2/rom/rtc.h>
+#elif defined(CONFIG_IDF_TARGET_ESP32S3)
+#include <esp32s3/rom/rtc.h>
+#elif defined(CONFIG_IDF_TARGET_ESP32C3)
+#include <esp32c3/rom/rtc.h>
+#elif defined(CONFIG_IDF_TARGET_ESP32H2)
+#include <esp32h2/rom/rtc.h>
+#elif defined(CONFIG_IDF_TARGET_ESP32C2)
+#include <esp32c2/rom/rtc.h>
 #endif
 
-#endif // _RTOS_INCLUDES_H_
+namespace openmrn_arduino
+{
+
+/// Utility class which logs information about the currently running SoC.
+class Esp32SocInfo
+{
+public:
+    /// Logs information about the currently running SoC.
+    ///
+    /// @return Reason for the reset of the SoC.
+    static uint8_t print_soc_info();
+};
+
+} // namespace openmrn_arduino
+
+using openmrn_arduino::Esp32SocInfo;
+
+#endif // ESP_PLATFORM
+
+#endif // _FREERTOS_DRIVERS_ESP32_ESP32SOCINFO_HXX_

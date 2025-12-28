@@ -13,10 +13,10 @@
 
 #ifdef __FreeRTOS__
 
-#include "FreeRTOS.h"
-#include "task.h"
-#include "semphr.h"
-#include "queue.h"
+#include <freertos/FreeRTOS.h>
+#include <freertos/task.h>
+#include <freertos/semphr.h>
+#include <freertos/queue.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -74,6 +74,151 @@ int os_mq_receive_from_isr_freertos(os_mq_t queue, void *data, int *woken);
 int os_mq_num_pending_freertos(os_mq_t queue);
 int os_mq_num_pending_from_isr_freertos(os_mq_t queue);
 int os_mq_num_spaces_freertos(os_mq_t queue);
+
+// Static initializer macros
+/** Static initializer for mutexes */
+#define OS_MUTEX_INITIALIZER {NULL, 0}
+/** Static initializer for recursive mutexes */
+#define OS_RECURSIVE_MUTEX_INITIALIZER {NULL, 1}
+
+// Inline function implementations
+static inline os_thread_t os_thread_self(void)
+{
+    return os_thread_self_freertos();
+}
+
+static inline int os_thread_get_priority(os_thread_t thread)
+{
+    return os_thread_get_priority_freertos(thread);
+}
+
+static inline int os_thread_get_priority_min(void)
+{
+    return os_thread_get_priority_min_freertos();
+}
+
+static inline int os_thread_get_priority_max(void)
+{
+    return os_thread_get_priority_max_freertos();
+}
+
+static inline int os_mutex_init(os_mutex_t *mutex)
+{
+    return os_mutex_init_freertos(mutex);
+}
+
+static inline int os_recursive_mutex_init(os_mutex_t *mutex)
+{
+    return os_recursive_mutex_init_freertos(mutex);
+}
+
+static inline int os_mutex_destroy(os_mutex_t *mutex)
+{
+    return os_mutex_destroy_freertos(mutex);
+}
+
+static inline int os_mutex_lock(os_mutex_t *mutex)
+{
+    return os_mutex_lock_freertos(mutex);
+}
+
+static inline int os_mutex_unlock(os_mutex_t *mutex)
+{
+    return os_mutex_unlock_freertos(mutex);
+}
+
+static inline int os_sem_init(os_sem_t *sem, unsigned int value)
+{
+    return os_sem_init_freertos(sem, value);
+}
+
+static inline int os_sem_destroy(os_sem_t *sem)
+{
+    return os_sem_destroy_freertos(sem);
+}
+
+static inline int os_sem_post(os_sem_t *sem)
+{
+    return os_sem_post_freertos(sem);
+}
+
+#if OPENMRN_FEATURE_RTOS_FROM_ISR
+static inline int os_sem_post_from_isr(os_sem_t *sem, int *woken)
+{
+    return os_sem_post_from_isr_freertos(sem, woken);
+}
+#endif
+
+static inline int os_sem_wait(os_sem_t *sem)
+{
+    return os_sem_wait_freertos(sem);
+}
+
+#if OPENMRN_FEATURE_SEM_TIMEDWAIT
+static inline int os_sem_timedwait(os_sem_t *sem, long long timeout)
+{
+    if (timeout == OPENMRN_OS_WAIT_FOREVER)
+    {
+        return os_sem_wait(sem);
+    }
+    return os_sem_timedwait_freertos(sem, timeout);
+}
+#endif
+
+static inline os_mq_t os_mq_create(size_t length, size_t item_size)
+{
+    return os_mq_create_freertos(length, item_size);
+}
+
+static inline void os_mq_send(os_mq_t queue, const void *data)
+{
+    os_mq_send_freertos(queue, data);
+}
+
+static inline int os_mq_timedsend(os_mq_t queue, const void *data, long long timeout)
+{
+    return os_mq_timedsend_freertos(queue, data, timeout);
+}
+
+static inline void os_mq_receive(os_mq_t queue, void *data)
+{
+    os_mq_receive_freertos(queue, data);
+}
+
+static inline int os_mq_timedreceive(os_mq_t queue, void *data, long long timeout)
+{
+    return os_mq_timedreceive_freertos(queue, data, timeout);
+}
+
+static inline int os_mq_send_from_isr(os_mq_t queue, const void *data, int *woken)
+{
+    return os_mq_send_from_isr_freertos(queue, data, woken);
+}
+
+static inline int os_mq_is_full_from_isr(os_mq_t queue)
+{
+    return os_mq_is_full_from_isr_freertos(queue);
+}
+
+static inline int os_mq_receive_from_isr(os_mq_t queue, void *data, int *woken)
+{
+    return os_mq_receive_from_isr_freertos(queue, data, woken);
+}
+
+static inline int os_mq_num_pending(os_mq_t queue)
+{
+    return os_mq_num_pending_freertos(queue);
+}
+
+static inline int os_mq_num_pending_from_isr(os_mq_t queue)
+{
+    return os_mq_num_pending_from_isr_freertos(queue);
+}
+
+static inline int os_mq_num_spaces(os_mq_t queue)
+{
+    return os_mq_num_spaces_freertos(queue);
+}
 
 #ifdef __cplusplus
 }

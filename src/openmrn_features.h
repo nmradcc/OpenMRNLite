@@ -37,8 +37,18 @@
 #ifndef _INCLUDE_OPENMRN_FEATURES_
 #define _INCLUDE_OPENMRN_FEATURES_
 
+#ifdef ESP_PLATFORM
+// Pull in ESP-IDF version macros when building as an ESP-IDF component.
+#include <esp_idf_version.h>
+#endif
+
+#ifndef ESP_IDF_VERSION
 #define ESP_IDF_VERSION 0
+#endif
+
+#ifndef ESP_IDF_VERSION_VAL
 #define ESP_IDF_VERSION_VAL(a,b,c) 1
+#endif
 
 #if defined(__FreeRTOS__)
 /// Compiles the FreeRTOS event group based ::select() implementation.
