@@ -48,6 +48,51 @@
 #include <event_groups.h>
 #endif
 
+#include "utils/macros.h"
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+#ifndef OS_INLINE
+/// Forces one definition of each inline function to be compiled.
+#define OS_INLINE extern inline __attribute__((__gnu_inline__))
+#endif
+
+// ============================================================================
+// Common OS macros and constants (must be defined before impl.h includes)
+// ============================================================================
+
+#define OS_PRIO_MIN 1 /**< lowest thread priority supported by abstraction */
+#define OS_PRIO_DEFAULT 0 /**< default thread priority */
+#define OS_PRIO_MAX 32 /**< highest thread priority suported by abstraction */
+
+#define OS_MQ_NONE     0 /**< error code for no error for message queues */
+#define OS_MQ_TIMEDOUT 1 /**< error code for timedout for message queues */
+#define OS_MQ_EMPTY    2 /**< error code for the queue being empty */
+#define OS_MQ_FULL     3 /**< error code for queue being full */
+
+#if defined LLONG_MAX
+#define OPENMRN_OS_WAIT_FOREVER LLONG_MAX /**< maximum timeout period */
+#else
+#define OPENMRN_OS_WAIT_FOREVER __LONG_LONG_MAX__ /**< maximum timeout period */
+#endif
+
+/** @ref os_thread_once states.
+ */
+enum
+{
+    OS_THREAD_ONCE_NEVER = 0, ///< not yet executed
+    OS_THREAD_ONCE_INPROGRESS, ///< execution in progress
+    OS_THREAD_ONCE_DONE ///< execution complete
+};
+/** initial value for one time intitialization instance */
+#define OS_THREAD_ONCE_INIT { OS_THREAD_ONCE_NEVER }
+
+// ============================================================================
+// Include RTOS-specific implementations
+// ============================================================================
+
 #if defined(OPENMRN_FEATURE_RTOS_FREERTOS) || defined(OPENMRN_FEATURE_RTOS_THREADX) || defined(OPENMRN_FEATURE_RTOS_CMSIS_V2)
 #include "rtos_includes.h"
 #endif
@@ -58,42 +103,7 @@
 #include "os/threadx_impl.h"
 #elif defined(OPENMRN_FEATURE_RTOS_CMSIS_V2)
 #include "os/cmsis_rtos2_impl.h"
-#endif
-
-#include "utils/macros.h"
-
-#ifdef __cplusplus
-extern "C" {
-#endif
-
-
-#ifndef OS_INLINE
-/// Forces one definition of each inline function to be compiled.
-#define OS_INLINE extern inline __attribute__((__gnu_inline__))
-#endif
-
-/** Entry point to application.
- * @param argc number of arguments
- * @param argv list of arguments
- * @return 0 upon success.
- */
-int appl_main(int argc, char *argv[]);
-
-/// @return the available heap or -1 if this operation is not supported.
-ssize_t os_get_free_heap(void);
-
-#if defined (__FreeRTOS__)
-
-extern void hw_init(void);
-
-/** Stack size of the main thread */
-extern const size_t main_stack_size;
-
-/** priority of the main thread */
-extern const int main_priority;
-#endif
-
-#if OPENMRN_FEATURE_MUTEX_FAKE
+#elif OPENMRN_FEATURE_MUTEX_FAKE
 // Used for single-threaded environments
 typedef struct {
     int locked;
@@ -339,17 +349,6 @@ extern long long os_get_time_monotonic(void);
  */
 extern long long os_get_fake_time(void);
 
-/** @ref os_thread_once states.
- */
-enum
-{
-    OS_THREAD_ONCE_NEVER = 0, ///< not yet executed
-    OS_THREAD_ONCE_INPROGRESS, ///< execution in progress
-    OS_THREAD_ONCE_DONE ///< execution complete
-};
-/** initial value for one time intitialization instance */
-#define OS_THREAD_ONCE_INIT { OS_THREAD_ONCE_NEVER }
-
 /** One time intialization routine
  * @param once one time instance
  * @param routine method to call once
@@ -357,19 +356,39 @@ enum
  */
 int os_thread_once(os_thread_once_t *once, void (*routine)(void));
 
-#define OS_PRIO_MIN 1 /**< lowest thread priority supported by abstraction */
-#define OS_PRIO_DEFAULT 0 /**< default thread priority */
-#define OS_PRIO_MAX 32 /**< highest thread priority suported by abstraction */
+/** Entry point to application.
+ * @param argc number of arguments
+ * @param argv list of arguments
+ * @return 0 upon success.
+ */
+int appl_main(int argc, char *argv[]);
 
-#define OS_MQ_NONE     0 /**< error code for no error for message queues */
-#define OS_MQ_TIMEDOUT 1 /**< error code for timedout for message queues */
-#define OS_MQ_EMPTY    2 /**< error code for the queue being empty */
-#define OS_MQ_FULL     3 /**< error code for queue being full */
+/// @return the available heap or -1 if this operation is not supported.
+ssize_t os_get_free_heap(void);
 
-#if defined LLONG_MAX
-#define OPENMRN_OS_WAIT_FOREVER LLONG_MAX /**< maximum timeout period */
-#else
-#define OPENMRN_OS_WAIT_FOREVER __LONG_LONG_MAX__ /**< maximum timeout period */
+#if defined (__FreeRTOS__)
+
+extern void hw_init(void);
+
+/** Stack size of the main thread */
+extern const size_t main_stack_size;
+
+/** priority of the main thread */
+extern const int main_priority;
+#endif
+
+#ifndef container_of
+/** Get a pointer to the parent structure of one of its members.
+ * @param _ptr original member pointer
+ * @param _type parent structure type
+ * @param _member name of member within structure
+ * @return pointer to the parent structure
+ */
+#define container_of(_ptr, _type, _member)                  \
+({                                                       \
+    const typeof( ((_type *)0)->_member ) *__mptr = (_ptr); \
+    (_type *)( (char *)__mptr - offsetof(_type,_member) );  \
+})
 #endif
 
 /** Convert a nanosecond value to a microsecond value.
@@ -517,177 +536,50 @@ int os_thread_create(os_thread_t *thread, const char *name, int priority,
  */
 void os_thread_cancel(os_thread_t thread);
 
-/** Return a handle to the calling thread.
- * @return a handle to the calling thread
- */
-OS_INLINE os_thread_t os_thread_self(void);
+// ============================================================================
+// Inline function implementations for thread priority, mutex, semaphore, and
+// message queue operations are provided by the RTOS-specific impl.h files
+// (freertos_impl.h, threadx_impl.h, cmsis_rtos2_impl.h) which are included
+// above based on the OPENMRN_FEATURE_RTOS_* macros.
+//
+// The impl.h files define these static inline functions:
+//   Thread:     os_thread_self(), os_thread_get_priority(),
+//               os_thread_get_priority_min(), os_thread_get_priority_max()
+//   Mutex:      os_mutex_init(), os_recursive_mutex_init(), os_mutex_destroy(),
+//               os_mutex_lock(), os_mutex_unlock()
+//   Semaphore:  os_sem_init(), os_sem_destroy(), os_sem_post(), os_sem_wait()
+//               os_sem_post_from_isr(), os_sem_timedwait() (if supported)
+//   Msg Queue:  os_mq_create(), os_mq_send(), os_mq_timedsend(),
+//               os_mq_receive(), os_mq_timedreceive(), os_mq_send_from_isr(),
+//               os_mq_is_full_from_isr(), os_mq_receive_from_isr(),
+//               os_mq_num_pending(), os_mq_num_pending_from_isr(), os_mq_num_spaces()
+// ============================================================================
 
-/** Return the current thread priority.
- * @param thread handle to thread of interest
- * @return current thread priority
- */
-OS_INLINE int os_thread_get_priority(os_thread_t thread);
 
-/** Get the minimum thread priority.
- * @return minimum trhead priority
- */
-OS_INLINE int os_thread_get_priority_min(void);
 
-/** Get the maximum thread priority.
- * @return maximum trhead priority
- */
-OS_INLINE int os_thread_get_priority_max(void);
 
-/** Initialize mutex.
- * @param mutex address of mutex handle to initialize
- * @return 0 upon succes or error number upon failure
- */
-OS_INLINE int os_mutex_init(os_mutex_t *mutex);
 
-/** Initialize recursive mutex.
- * @param mutex address of mutex handle to initialize
- * @return 0 upon succes or error number upon failure
- */
-OS_INLINE int os_recursive_mutex_init(os_mutex_t *mutex);
 
-/** Destroy a mutex.
- * @param mutex address of mutex handle to destroy
- * @return 0 upon succes or error number upon failure
- */
-OS_INLINE int os_mutex_destroy(os_mutex_t *mutex);
 
-/** Lock a mutex.
- * @param mutex address of mutex handle to lock
- * @return 0 upon succes or error number upon failure
- */
-OS_INLINE int os_mutex_lock(os_mutex_t *mutex);
 
-/** Unlock a mutex.
- * @param mutex address of mutex handle to unlock
- * @return 0 upon succes or error number upon failure
- */
-OS_INLINE int os_mutex_unlock(os_mutex_t *mutex);
 
-/** Initialize a semaphore.
- * @param sem address of semaphore to initialize
- * @param value initial value of semaphore
- * @return 0 upon success
- */
-OS_INLINE int os_sem_init(os_sem_t *sem, unsigned int value);
 
-/** Destroy a semaphore.
- * @param sem address of semaphore to destroy
- * @return 0 upon success
- */
-OS_INLINE int os_sem_destroy(os_sem_t *sem);
 
-/** Post a semaphore.
- * @param sem address of semaphore to increment
- * @return 0 upon success
- */
-OS_INLINE int os_sem_post(os_sem_t *sem);
 
-#if OPENMRN_FEATURE_RTOS_FROM_ISR
-/** Post a semaphore from the ISR context.
- * @param sem address of semaphore to increment
- * @param woken is the task woken up
- * @return 0 upon success
- */
-OS_INLINE int os_sem_post_from_isr(os_sem_t *sem, int *woken);
-#endif // OPENMRN_FEATURE_RTOS_FROM_ISR
 
-/** Wait on a semaphore.
- * @param sem address of semaphore to decrement
- * @return 0 upon success
- */
-OS_INLINE int os_sem_wait(os_sem_t *sem);
 
-#if OPENMRN_FEATURE_SEM_TIMEDWAIT
-/** Wait on a semaphore with a timeout.
- * @param sem address of semaphore to decrement
- * @param timeout in nanoseconds, else OPENMRN_OS_WAIT_FOREVER to wait forever
- * @return 0 upon success, else -1 with errno set to indicate error
- */
-OS_INLINE int os_sem_timedwait(os_sem_t *sem, long long timeout);
-#endif // OPENMRN_FEATURE_SEM_TIMEDWAIT
 
-/** Create a new message queue.
- * @param length length in number of messages of the queue
- * @param item_size size in number of bytes of a message
- * @return handle to the created queue, NULL on failure
- */
-OS_INLINE os_mq_t os_mq_create(size_t length, size_t item_size);
 
-/** Blocking send of a message to a queue.
- * @param queue queue to send message to
- * @param data message to copy into queue
- */
-OS_INLINE void os_mq_send(os_mq_t queue, const void *data);
 
-/** Send a message to a queue with a timeout.
- * @param queue queue to send message to
- * @param data message to copy into queue
- * @param timeout time in nanoseconds to wait for queue to be able to accept message
- * @return OS_MQ_NONE on success, OS_MQ_TIMEDOUT on timeout
- */
-OS_INLINE int os_mq_timedsend(os_mq_t queue, const void *data, long long timeout);
 
-/** Blocking receive a message from a queue.
- * @param queue queue to receive message from
- * @param data location to copy message from the queue
- */
-OS_INLINE void os_mq_receive(os_mq_t queue, void *data);
 
-/** Receive a message from a queue.
- * @param queue queue to receive message from
- * @param data location to copy message from the queue
- * @param timeout time in nanoseconds to wait for queue to have a message available
- * @return OS_MQ_NONE on success, OS_MQ_TIMEDOUT on timeout
- */
-OS_INLINE int os_mq_timedreceive(os_mq_t queue, void *data, long long timeout);
 
-/** Send of a message to a queue from ISR context.
- * @param queue queue to send message to
- * @param data message to copy into queue
- * @param woken is the task woken up
- * @return OS_MQ_NONE on success, else OS_MQ_FULL
- */
-OS_INLINE int os_mq_send_from_isr(os_mq_t queue, const void *data, int *woken);
 
-/** Check if a queue is full from ISR context.
- * @param queue is the queue to check
- * @return non-zero if the queue is full.
- */
-OS_INLINE int os_mq_is_full_from_isr(os_mq_t queue);
 
-/** Receive a message from a queue from ISR context.
- * @param queue queue to receive message from
- * @param data location to copy message from the queue
- * @param woken is the task woken up
- * @return OS_MQ_NONE on success, else OS_MQ_FULL
- */
-OS_INLINE int os_mq_receive_from_isr(os_mq_t queue, void *data, int *woken);
 
-/** Return the number of messages pending in the queue.
- * @param queue queue to check
- * @return number of messages in the queue
- */
-OS_INLINE int os_mq_num_pending(os_mq_t queue);
 
-/** Return the number of messages pending in the queue from ISR context.
- * @param queue queue to check
- * @return number of messages in the queue
- */
-OS_INLINE int os_mq_num_pending_from_isr(os_mq_t queue);
 
-/** Return the number of spaces available in the queue.
- * @param queue queue to check
- * @return number of spaces available
- */
-OS_INLINE int os_mq_num_spaces(os_mq_t queue);
 
-// All inline function implementations are provided by the RTOS-specific impl.h files
-// which are included above based on the OPENMRN_FEATURE_RTOS_* macros
 
 
 /** Get the monotonic time since the system started.

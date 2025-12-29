@@ -8,7 +8,7 @@
  * @date 20 December 2025
  */
 
-#ifdef __FreeRTOS__
+#ifdef USING_FREERTOS
 
 #include "os/os.h"
 #include "rtos_includes.h"

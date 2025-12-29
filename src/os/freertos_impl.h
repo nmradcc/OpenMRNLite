@@ -11,12 +11,59 @@
 #ifndef _OS_FREERTOS_IMPL_H_
 #define _OS_FREERTOS_IMPL_H_
 
-#ifdef __FreeRTOS__
+#ifdef USING_FREERTOS
 
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
 #include <freertos/semphr.h>
 #include <freertos/queue.h>
+
+// ============================================================================
+// FreeRTOS-specific feature definitions
+// ============================================================================
+
+/// Compile os_sem_timedwait functions.
+#define OPENMRN_FEATURE_SEM_TIMEDWAIT 1
+
+/// Enables use of Notifiable::notify_from_isr and OSSem::post_from_isr.
+#define OPENMRN_FEATURE_RTOS_FROM_ISR 1
+
+/// Use FreeRTOS implementation for os_thread_create and keeping a list of live threads.
+#define OPENMRN_FEATURE_THREAD_FREERTOS 1
+
+/// Compiles the FreeRTOS event group based ::select() implementation.
+#define OPENMRN_FEATURE_DEVICE_SELECT 0 // Disabled for now
+
+/// Adds implementations for ::read ::write etc, with fd table.
+#define OPENMRN_FEATURE_DEVTAB 0 // Disabled for now
+
+/// Adds struct reent pointer to the FreeRTOS Task Priv structure and swaps it
+/// in when the tasks are swapped in.
+#define OPENMRN_FEATURE_REENT 1
+
+/// Adds support for FD based CAN interfaces.
+#define OPENMRN_FEATURE_FD_CAN_DEVICE 1
+
+/// Compiles support for BSD sockets API.
+#define OPENMRN_FEATURE_BSD_SOCKETS 1
+
+/// Compiles support for calling getsockname when binding a socket to a port
+/// when listening for incoming connections.
+#define OPENMRN_HAVE_BSD_SOCKETS_GETSOCKNAME 1
+
+/// Enables the code using ::fstat to confirm if the file handle is a socket.
+#define OPENMRN_HAVE_SOCKET_FSTAT 1
+
+#if defined(OPENMRN_FEATURE_DEVTAB)
+/// Enables the code using ::open ::close ::read ::write for non-volatile
+/// storage, FileMemorySpace for the configuration space, and
+/// SNIP_DYNAMIC_FILE_NAME for node names.
+#define OPENMRN_HAVE_POSIX_FD 1
+#endif
+
+#if defined(OPENMRN_FEATURE_DEVICE_SELECT)
+#define OPENMRN_FEATURE_EXECUTOR_SELECT 1
+#endif
 
 #ifdef __cplusplus
 extern "C" {

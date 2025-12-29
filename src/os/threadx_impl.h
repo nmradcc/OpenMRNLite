@@ -15,6 +15,19 @@
 
 #include "tx_api.h"
 
+// ============================================================================
+// ThreadX-specific feature definitions
+// ============================================================================
+
+/// Compile os_sem_timedwait functions.
+#define OPENMRN_FEATURE_SEM_TIMEDWAIT 1
+
+/// Enables use of Notifiable::notify_from_isr and OSSem::post_from_isr.
+#define OPENMRN_FEATURE_RTOS_FROM_ISR 1
+
+// ThreadX support is minimal for now
+// TODO: Implement DEVTAB, REENT, FD_CAN_DEVICE, BSD_SOCKETS and other features for ThreadX
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -32,6 +45,17 @@ typedef TX_QUEUE* os_mq_t;
 typedef struct {
     TX_SEMAPHORE sem;
 } os_sem_t;
+
+typedef struct
+{
+    unsigned char state; /**< keep track if already executed */
+} os_thread_once_t; /**< one time initialization type */
+
+// Static initializer macros
+/** Static initializer for mutexes (ThreadX mutexes must be initialized at runtime) */
+#define OS_MUTEX_INITIALIZER {{0}, 0}
+/** Static initializer for recursive mutexes (ThreadX mutexes must be initialized at runtime) */
+#define OS_RECURSIVE_MUTEX_INITIALIZER {{0}, 1}
 
 // ThreadX implementation functions
 int os_thread_create_threadx(os_thread_t *thread, const char *name, int priority,
@@ -52,13 +76,10 @@ void os_thread_sleep_threadx(long long nsec);
 TX_QUEUE* os_mq_create_threadx(size_t length, size_t item_size);
 int os_mutex_destroy_threadx(os_mutex_t *mutex);
 
-// Static initializer macros
-/** Static initializer for mutexes (ThreadX mutexes must be initialized at runtime) */
-#define OS_MUTEX_INITIALIZER {{0}, 0}
-/** Static initializer for recursive mutexes (ThreadX mutexes must be initialized at runtime) */
-#define OS_RECURSIVE_MUTEX_INITIALIZER {{0}, 1}
-
+// ============================================================================
 // Inline function implementations
+// ============================================================================
+
 static inline os_thread_t os_thread_self(void)
 {
     return os_thread_self_threadx();

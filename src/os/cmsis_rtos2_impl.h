@@ -15,6 +15,19 @@
 
 #include "cmsis_os2.h"
 
+// ============================================================================
+// CMSIS-RTOS v2 specific feature definitions
+// ============================================================================
+
+/// Compile os_sem_timedwait functions.
+#define OPENMRN_FEATURE_SEM_TIMEDWAIT 1
+
+/// Enables use of Notifiable::notify_from_isr and OSSem::post_from_isr.
+#define OPENMRN_FEATURE_RTOS_FROM_ISR 1
+
+// CMSIS-RTOS v2 support is minimal for now
+// TODO: Implement DEVTAB, REENT, FD_CAN_DEVICE, BSD_SOCKETS and other features for CMSIS-RTOS v2
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -32,6 +45,17 @@ typedef osMessageQueueId_t os_mq_t;
 typedef struct {
     osSemaphoreId_t sem;
 } os_sem_t;
+
+typedef struct
+{
+    unsigned char state; /**< keep track if already executed */
+} os_thread_once_t; /**< one time initialization type */
+
+// Static initializer macros (CMSIS-RTOS v2 requires runtime initialization)
+/** Static initializer for mutexes */
+#define OS_MUTEX_INITIALIZER {{0}, 0}
+/** Static initializer for recursive mutexes */
+#define OS_RECURSIVE_MUTEX_INITIALIZER {{0}, 1}
 
 // CMSIS-RTOS v2 implementation functions
 int os_thread_create_cmsis(os_thread_t *thread, const char *name, int priority,
@@ -51,12 +75,6 @@ void os_thread_sleep_cmsis(long long nsec);
 
 int os_mutex_destroy_cmsis(os_mutex_t *mutex);
 int os_sem_destroy_cmsis(os_sem_t *sem);
-
-// Static initializer macros (CMSIS-RTOS v2 requires runtime initialization)
-/** Static initializer for mutexes */
-#define OS_MUTEX_INITIALIZER {{0}, 0}
-/** Static initializer for recursive mutexes */
-#define OS_RECURSIVE_MUTEX_INITIALIZER {{0}, 1}
 
 // Inline function implementations
 static inline os_thread_t os_thread_self(void)
