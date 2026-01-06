@@ -5,7 +5,7 @@ This document describes how to build OpenMRNLite using CMake for embedded target
 ## Requirements
 
 - CMake 3.12 or higher
-- Cross-compilation toolchain for your target (ARM GCC, AVR GCC, etc.)
+- Cross-compilation toolchain for your target (ARM GCC, etc.)
 - C++14 compatible compiler
 - C11 compatible compiler
 - Toolchain file configured for your embedded target
@@ -108,9 +108,6 @@ Ensure your cross-compiler is installed and in your PATH:
 ```bash
 # For ARM
 arm-none-eabi-gcc --version
-
-# For AVR
-avr-gcc --version
 ```
 
 ### Compiler warnings
