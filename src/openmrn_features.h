@@ -57,6 +57,18 @@
 /// MemoryConfig.cxx.
 #define OPENMRN_FEATURE_REBOOT 1
 
+/// When defined to 1, includes BLE (Bluetooth Low Energy) support.
+/// Set via CMake option OPENMRN_ENABLE_BLE (default: ON).
+#ifndef OPENMRN_FEATURE_BLE
+#define OPENMRN_FEATURE_BLE 0
+#endif
+
+/// When defined to 1, includes DCC (Digital Command Control) support.
+/// Set via CMake option OPENMRN_ENABLE_DCC (default: ON).
+#ifndef OPENMRN_FEATURE_DCC
+#define OPENMRN_FEATURE_DCC 0
+#endif
+
 // ============================================================================
 // RTOS-specific features are defined in os/*_impl.h files:
 // - freertos_impl.h: FreeRTOS features

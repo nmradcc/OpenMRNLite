@@ -11,6 +11,8 @@ set(CMAKE_C_STANDARD_REQUIRED ON)
 # Options
 option(BUILD_EXAMPLES "Build example applications" OFF)
 option(BUILD_SHARED_LIBS "Build shared libraries" OFF)
+option(OPENMRN_ENABLE_BLE "Enable BLE (Bluetooth Low Energy) support" OFF)
+option(OPENMRN_ENABLE_DCC "Enable DCC (Digital Command Control) support" OFF)
 
 # RTOS Selection (only one should be enabled)
 set(OPENMRN_RTOS "None" CACHE STRING "Select RTOS: FreeRTOS, ThreadX, CMSIS_RTOS_V2, or None")
@@ -39,13 +41,29 @@ set(OPENMRNLITE_INCLUDE_DIRS
 
 # Collect all source files
 file(GLOB_RECURSE OPENMRNLITE_SOURCES
-    src/ble/*.cpp
-    src/dcc/*.cpp
     src/executor/*.cpp
     src/openlcb/*.cpp
     src/utils/*.cpp
     src/OpenMRNLite.cpp
 )
+
+# Add optional BLE support
+if(OPENMRN_ENABLE_BLE)
+    file(GLOB_RECURSE BLE_SOURCES src/ble/*.cpp)
+    list(APPEND OPENMRNLITE_SOURCES ${BLE_SOURCES})
+    message(STATUS "BLE support: Enabled")
+else()
+    message(STATUS "BLE support: Disabled")
+endif()
+
+# Add optional DCC support
+if(OPENMRN_ENABLE_DCC)
+    file(GLOB_RECURSE DCC_SOURCES src/dcc/*.cpp)
+    list(APPEND OPENMRNLITE_SOURCES ${DCC_SOURCES})
+    message(STATUS "DCC support: Enabled")
+else()
+    message(STATUS "DCC support: Disabled")
+endif()
 
 # Add platform-specific drivers only for FreeRTOS (they depend on FreeRTOS features)
 if(OPENMRN_RTOS STREQUAL "FreeRTOS")
@@ -109,6 +127,15 @@ endif()
 target_compile_definitions(OpenMRNLite PUBLIC
     $<$<CONFIG:Debug>:DEBUG>
 )
+
+# Add optional module definitions
+if(OPENMRN_ENABLE_BLE)
+    target_compile_definitions(OpenMRNLite PUBLIC OPENMRN_FEATURE_BLE=1)
+endif()
+
+if(OPENMRN_ENABLE_DCC)
+    target_compile_definitions(OpenMRNLite PUBLIC OPENMRN_FEATURE_DCC=1)
+endif()
 
 # Add RTOS-specific definitions
 if(OPENMRN_RTOS STREQUAL "ThreadX")
@@ -230,5 +257,7 @@ message(STATUS "  Target processor:  ${CMAKE_SYSTEM_PROCESSOR}")
 message(STATUS "  Toolchain file:    ${CMAKE_TOOLCHAIN_FILE}")
 message(STATUS "  Build examples:    ${BUILD_EXAMPLES}")
 message(STATUS "  Build shared libs: ${BUILD_SHARED_LIBS}")
+message(STATUS "  BLE support:       ${OPENMRN_ENABLE_BLE}")
+message(STATUS "  DCC support:       ${OPENMRN_ENABLE_DCC}")
 message(STATUS "  Install prefix:    ${CMAKE_INSTALL_PREFIX}")
 message(STATUS "")

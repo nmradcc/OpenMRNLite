@@ -7,6 +7,12 @@ control. OpenMRN is one of the most extensible implementation of this protocol
 suite. This Lite version has been adapted to work with the programming model and
 drivers of the Arduino ecosystem.
 
+## Documentation
+
+- [Build Instructions](BUILD.md) - How to build the library and examples
+- [RTOS Support](RTOS_SUPPORT.md) - Information about RTOS integration
+- [Optional Modules](OPTIONAL_MODULES.md) - How to enable/disable BLE and DCC modules
+
 ## Supported platforms/architectures
 At this time the only supported platforms are:
 
