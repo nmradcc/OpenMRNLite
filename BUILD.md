@@ -38,7 +38,7 @@ You can customize the build using the following options:
 
 ```bash
 cmake .. -DCMAKE_TOOLCHAIN_FILE=toolchain.cmake  # REQUIRED: Specify toolchain
-cmake .. -DOPENMRN_RTOS=FreeRTOS                 # Select RTOS: FreeRTOS (default), ThreadX, CMSIS_RTOS_V2, or None
+cmake .. -DOPENMRN_RTOS=FreeRTOS                 # Select RTOS: FreeRTOS, ThreadX, CMSIS_RTOS_V2, or None (default)
 cmake .. -DBUILD_EXAMPLES=ON                     # Build example applications (default: OFF)
 cmake .. -DBUILD_SHARED_LIBS=ON                  # Build shared libraries (default: OFF)
 cmake .. -DCMAKE_BUILD_TYPE=Debug                # Set build type: Debug, Release, etc.

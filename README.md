@@ -11,7 +11,6 @@ drivers of the Arduino ecosystem.
 At this time the only supported platforms are:
 
 * STM32, but no examples are available at this time.
-* SAM (Feather M4 CAN)
 
 Additional platforms may be added in the future.
 

@@ -4,18 +4,17 @@ OpenMRNLite now supports multiple RTOS options for embedded targets:
 
 ## Supported RTOS Options
 
-1. **FreeRTOS** (default) - The most widely used embedded RTOS
+1. **FreeRTOS** - The most widely used embedded RTOS
 2. **ThreadX** - Azure RTOS ThreadX
 3. **CMSIS-RTOS v2** - ARM CMSIS-RTOS v2 API
+4. **None** - No OS (single-threaded)
 
 ## Selecting an RTOS
 
 When configuring your CMake build, specify the RTOS using the `-DOPENMRN_RTOS` option:
 
-### FreeRTOS (Default)
+### FreeRTOS
 ```bash
-cmake .. -DCMAKE_TOOLCHAIN_FILE=toolchain.cmake
-# or explicitly:
 cmake .. -DCMAKE_TOOLCHAIN_FILE=toolchain.cmake -DOPENMRN_RTOS=FreeRTOS
 ```
 
@@ -28,6 +27,13 @@ cmake .. -DCMAKE_TOOLCHAIN_FILE=toolchain.cmake -DOPENMRN_RTOS=ThreadX
 ```bash
 cmake .. -DCMAKE_TOOLCHAIN_FILE=toolchain.cmake -DOPENMRN_RTOS=CMSIS_RTOS_V2
 ```
+
+### None
+```bash
+cmake .. -DCMAKE_TOOLCHAIN_FILE=toolchain.cmake
+
+```
+
 
 ## RTOS-Specific Requirements
 
