@@ -40,6 +40,10 @@
 #include "utils/macros.h"
 #include "os/os.h"
 
+#if defined(OPENMRN_FEATURE_RTOS_FREERTOS)
+#include <freertos/event_groups.h>
+#endif
+
 /** This class provides a threading API.
  */
 class OSThread
@@ -589,7 +593,7 @@ private:
     ~OSTime();
 };
 
-#if defined (__FreeRTOS__)
+#if defined(OPENMRN_FEATURE_RTOS_FREERTOS)
 /** Event bit mask type */
 typedef EventBits_t OSEventType;
 /** Abstraction to a group of event bits that can support a masked pend.
@@ -734,6 +738,6 @@ private:
     EventGroupHandle_t event;
 };
 
-#endif // __FreeRTOS__
+#endif // OPENMRN_FEATURE_RTOS_FREERTOS
 
 #endif /* _OS_OS_HXX_ */

@@ -45,8 +45,19 @@ add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/../.. ${CMAKE_CURRENT_BINARY_DIR}/o
 
 target_include_directories(OpenMRNLite PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/Inc
+    ${CMAKE_CURRENT_SOURCE_DIR}/Drivers/STM32H5xx_HAL_Driver/Inc
+    ${CMAKE_CURRENT_SOURCE_DIR}/Drivers/STM32H5xx_HAL_Driver/Inc/Legacy
+    ${CMAKE_CURRENT_SOURCE_DIR}/Drivers/BSP/STM32H5xx_Nucleo
+    ${CMAKE_CURRENT_SOURCE_DIR}/Drivers/CMSIS/Device/ST/STM32H5xx/Include
+    ${CMAKE_CURRENT_SOURCE_DIR}/Drivers/CMSIS/Include
     Middlewares/Third_Party/FreeRTOS/Source/include
     Middlewares/Third_Party/FreeRTOS/Source/portable/GCC/ARM_CM33_NTZ/non_secure
+    )
+
+# Add compile definitions for OpenMRNLite to know which STM32 variant
+target_compile_definitions(OpenMRNLite PRIVATE
+    STM32H563xx
+    USE_HAL_DRIVER
     )
 
 # Link directories setup
@@ -58,7 +69,7 @@ target_link_directories(${CMAKE_PROJECT_NAME} PRIVATE
 target_sources(${CMAKE_PROJECT_NAME} PRIVATE
     # Add user sources here
     Src/OpenMRNLite_client.cpp
-    Src/OpenMRNLite_server.cpp
+#    Src/OpenMRNLite_server.cpp
 )
 
 # Add include paths

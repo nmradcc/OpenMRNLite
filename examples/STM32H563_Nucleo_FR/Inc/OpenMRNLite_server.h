@@ -14,7 +14,7 @@ extern "C" {
   * @param  thread_input: Thread input parameter
   * @retval None
   */
-void OpenMRNLite_server_Entry(ULONG thread_input);
+void OpenMRNLite_server_Entry(unsigned long thread_input);
 
 #ifdef __cplusplus
 }

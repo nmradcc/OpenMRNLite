@@ -23,6 +23,10 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include "main.h"
+#include "stm32h5xx_nucleo.h"
+#include "OpenMRNLite_client.h"
+#include "OpenMRNLite_server.h"
+
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -50,6 +54,14 @@ const osThreadAttr_t defaultTask_attributes = {
   .name = "defaultTask",
   .priority = (osPriority_t) osPriorityNormal,
   .stack_size = 128 * 4
+};
+
+/* Definitions for openmrnlite_clientTask */
+osThreadId_t openmrnlite_client_Handle;
+const osThreadAttr_t openmrnlite_client_attributes = {
+  .name = "openmrnlite_clientTask",
+  .priority = (osPriority_t) osPriorityNormal,
+  .stack_size = 512 * 4
 };
 
 /* Private function prototypes -----------------------------------------------*/
@@ -84,6 +96,8 @@ void MX_FREERTOS_Init(void) {
   /* USER CODE END RTOS_QUEUES */
   /* creation of defaultTask */
   defaultTaskHandle = osThreadNew(StartDefaultTask, NULL, &defaultTask_attributes);
+
+  openmrnlite_client_Handle = osThreadNew(OpenMRNLite_client_Entry, NULL, &openmrnlite_client_attributes);
 
   /* USER CODE BEGIN RTOS_THREADS */
   /* add threads, ... */

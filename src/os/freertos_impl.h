@@ -18,6 +18,8 @@
 #include <freertos/semphr.h>
 #include <freertos/queue.h>
 
+#define __FreeRTOS__ 1
+
 // ============================================================================
 // FreeRTOS-specific feature definitions
 // ============================================================================

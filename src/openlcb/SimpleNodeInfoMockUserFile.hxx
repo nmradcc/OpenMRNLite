@@ -38,10 +38,6 @@
 #define _OPENLCB_SIMPLENODEINFOMOCKUSERFILE_HXX_
 
 #include "SimpleNodeInfo.hxx"
-#ifdef __FreeRTOS__
-#include "freertos_drivers/common/RamDisk.hxx"
-#endif
-
 #include "os/TempFile.hxx"
 
 namespace openlcb {
@@ -57,23 +53,15 @@ namespace openlcb {
 class MockSNIPUserFile
 {
 public:
-#ifdef __FreeRTOS__
-    static constexpr const char* snip_user_file_path = "/etc/snip_user_data";
-#else
     static char snip_user_file_path[128];
-#endif
     MockSNIPUserFile(const char *user_name,
                      const char *user_description);
 
     ~MockSNIPUserFile();
 
 private:
-#ifdef __FreeRTOS__
     SimpleNodeDynamicValues snipData_;
-    RamDisk userFile_;
-#else
     TempFile userFile_;
-#endif
 };
 
 }  // namespace openlcb

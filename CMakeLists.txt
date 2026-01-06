@@ -51,8 +51,6 @@ file(GLOB_RECURSE OPENMRNLITE_SOURCES
 if(OPENMRN_RTOS STREQUAL "FreeRTOS")
     file(GLOB_RECURSE FREERTOS_DRIVER_SOURCES
         src/freertos_drivers/common/*.cpp
-        src/freertos_drivers/arduino/*.cpp
-        src/freertos_drivers/sam/*.cpp
         src/freertos_drivers/stm32/*.cpp
     )
     list(APPEND OPENMRNLITE_SOURCES ${FREERTOS_DRIVER_SOURCES})
@@ -73,6 +71,8 @@ elseif(OPENMRN_RTOS STREQUAL "None")
     list(FILTER OS_SOURCES EXCLUDE REGEX ".*/(MDNS|OSSelectWakeup|OS)\\.cpp$")
 else() # FreeRTOS (default)
     file(GLOB OS_SOURCES src/os/*.cpp src/os/freertos_impl.c)
+    # Exclude MDNS.cpp and OSSelectWakeup.cpp which are not compatible with embedded FreeRTOS
+    list(FILTER OS_SOURCES EXCLUDE REGEX ".*/(MDNS|OSSelectWakeup)\\.cpp$")
 endif()
 
 list(APPEND OPENMRNLITE_SOURCES ${OS_SOURCES})

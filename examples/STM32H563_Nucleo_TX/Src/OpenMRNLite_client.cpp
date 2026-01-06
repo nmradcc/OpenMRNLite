@@ -10,7 +10,7 @@
 /// assigned to the developer (get a range assigned to you via openlcb.org).
 static constexpr uint64_t NODE_ID = UINT64_C(0x050101011824);
 
-OpenMRN openmrn(NODE_ID);
+static OpenMRN openmrn(NODE_ID);
 
 namespace openlcb
 {
@@ -19,7 +19,7 @@ namespace openlcb
 extern const SimpleNodeStaticValues SNIP_STATIC_DATA = {
     4,
     "OpenMRN",
-    "CAN-Node STM32H563_NUCLEO",
+    "CAN-Node STM32H563_NUCLEO client",
     "STM32H563 NUCLEO",
     "1.00"
 };
@@ -33,8 +33,9 @@ void OpenMRNLite_client_Entry(ULONG thread_input)
 {
     while (1)
     {
-        openmrn.loop();
+
         // Main OpenMRNLite processing loop
+        openmrn.loop();
         BSP_LED_Toggle(LED_YELLOW);
         tx_thread_sleep(200);
     }

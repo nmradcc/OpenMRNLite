@@ -100,7 +100,7 @@ UINT App_ThreadX_Init(VOID *memory_ptr)
   {
     return TX_THREAD_ERROR;
   }
-  
+#if 0  
   /* Allocate the stack for OpenMRNLite server task  */
   if (tx_byte_allocate(byte_pool, (VOID**) &pointer,
                        2048, TX_NO_WAIT) != TX_SUCCESS)
@@ -114,7 +114,7 @@ UINT App_ThreadX_Init(VOID *memory_ptr)
   {
     return TX_THREAD_ERROR;
   }
-
+#endif
   /* USER CODE END App_ThreadX_Init */
 
   return ret;

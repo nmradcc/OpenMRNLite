@@ -2,6 +2,7 @@
 
 #include "OpenMRNLite_client.h"
 #include "main.h"
+//#include "tx_api.h"
 
 #include <OpenMRNLite.h>
 
@@ -9,12 +10,12 @@
 /// assigned to the developer (get a range assigned to you via openlcb.org).
 static constexpr uint64_t NODE_ID = UINT64_C(0x050101011824);
 
-OpenMRN openmrn(NODE_ID);
+//OpenMRN openmrn(NODE_ID);
 
 
 extern "C" {
 
-void OpenMRNLite_client_Entry(ULONG thread_input)
+void OpenMRNLite_client_Entry(unsigned long thread_input)
 {
     // Initialize OpenMRNLite here
     

@@ -14,7 +14,7 @@
 
 extern "C" {
 
-void OpenMRNLite_server_Entry(ULONG thread_input)
+void OpenMRNLite_server_Entry(unsigned long thread_input)
 {
     // Initialize OpenMRNLite here
     

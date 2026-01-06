@@ -103,8 +103,8 @@ enum
 #include "os/threadx_impl.h"
 #elif defined(OPENMRN_FEATURE_RTOS_CMSIS_V2)
 #include "os/cmsis_rtos2_impl.h"
-#elif OPENMRN_FEATURE_MUTEX_FAKE
-// Used for single-threaded environments
+#else
+// Fallback for single-threaded environments or when no RTOS is configured
 typedef struct {
     int locked;
     uint8_t recursive;

@@ -33,6 +33,10 @@
 
 #if (!defined(ARDUINO)) || defined(ARDUINO_ARCH_STM32)
 
+// This driver is for older STM32 families with classic CAN controllers (not FDCAN)
+// STM32H5xx uses FDCAN which requires a different driver
+#if !defined(STM32H5xx) && !defined(STM32H563xx)
+
 #include "Stm32Can.hxx"
 
 #include <stdint.h>
@@ -741,5 +745,7 @@ void CAN1_SCE_IRQHandler(void)
     Stm32Can::instances[0]->sce_interrupt_handler();
 }
 } // extern "C"
+
+#endif // STM32H5xx check
 
 #endif // ARDUINO_ARCH_STM32

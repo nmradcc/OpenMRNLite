@@ -41,7 +41,7 @@
 #include "openmrn_features.h"
 #include "utils/logging.h"
 #ifdef __FreeRTOS__
-#include "freertos/can_ioctl.h"
+#include "can_ioctl.h"
 #endif
 
 #include "openlcb/ConfigUpdateFlow.hxx"

@@ -39,8 +39,8 @@
 
 #ifdef __FreeRTOS__
 #include <stdint.h>
-#include "freertos/FreeRTOS.h"
-#include "freertos/portmacro.h"
+#include "FreeRTOS.h"
+//#include "freertos/portmacro.h"
 
 /// Lightweight locking class for protecting small critical sections.
 ///

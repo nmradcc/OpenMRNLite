@@ -40,22 +40,6 @@
 #include "openlcb/SimpleNodeInfoMockUserFile.hxx"
 
 #include "utils/format_utils.hxx"
-
-#ifdef __FreeRTOS__
-openlcb::MockSNIPUserFile::MockSNIPUserFile(const char *user_name,
-                                            const char *user_description)
-    : snipData_{2}
-    , userFile_(MockSNIPUserFile::snip_user_file_path, &snipData_, false)
-{
-    str_populate(snipData_.user_name, user_name);
-    str_populate(snipData_.user_description, user_description);
-}
-
-openlcb::MockSNIPUserFile::~MockSNIPUserFile()
-{
-}
-
-#else
 #include "os/TempFile.hxx"
 
 openlcb::MockSNIPUserFile::MockSNIPUserFile(const char *user_name,
@@ -72,6 +56,4 @@ char openlcb::MockSNIPUserFile::snip_user_file_path[128] = "/dev/zero";
 openlcb::MockSNIPUserFile::~MockSNIPUserFile()
 {
 }
-
-#endif
 
