@@ -1,5 +1,13 @@
 cmake_minimum_required(VERSION 3.12)
 
+# Set system name for cross-compilation (must be before project())
+if(NOT CMAKE_SYSTEM_NAME)
+    set(CMAKE_SYSTEM_NAME Generic)
+endif()
+
+# Prevent CMake from adding platform-specific linker flags
+set(CMAKE_TRY_COMPILE_TARGET_TYPE STATIC_LIBRARY)
+
 project(OpenMRNLite VERSION 1.0.0 LANGUAGES C CXX)
 
 # Set C++ standard
@@ -24,15 +32,10 @@ if(NOT CMAKE_BUILD_TYPE)
     set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS "Debug" "Release" "MinSizeRel" "RelWithDebInfo")
 endif()
 
-# Require embedded target (cross-compilation)
-if(NOT CMAKE_SYSTEM_NAME STREQUAL "Generic")
-    message(FATAL_ERROR "OpenMRNLite only supports embedded targets. Please use a toolchain file with CMAKE_SYSTEM_NAME=Generic")
-endif()
-
 # Require toolchain file for cross-compilation
-if(NOT CMAKE_TOOLCHAIN_FILE)
-    message(WARNING "No toolchain file specified. Cross-compilation may not work correctly without CMAKE_TOOLCHAIN_FILE.")
-endif()
+#if(NOT CMAKE_TOOLCHAIN_FILE)
+#    message( "Using local toolchain file: gcc-arm-none-eabi.cmake")
+#endif()
 
 # Include directories
 set(OPENMRNLITE_INCLUDE_DIRS

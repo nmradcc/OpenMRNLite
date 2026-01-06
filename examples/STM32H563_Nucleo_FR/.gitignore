@@ -2,3 +2,4 @@ build
 mx.scratch
 !.settings
 !gcc-arm-none-eabi.cmake
+.clangd

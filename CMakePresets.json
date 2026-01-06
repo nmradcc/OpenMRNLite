@@ -1,0 +1,54 @@
+{
+  "version": 3,
+  "cmakeMinimumRequired": {
+    "major": 3,
+    "minor": 12,
+    "patch": 0
+  },
+  "configurePresets": [
+    {
+      "name": "default",
+      "displayName": "Default Configuration",
+      "description": "Minimal build without optional modules (default behavior)",
+      "binaryDir": "${sourceDir}/build",
+      "toolchainFile": "${sourceDir}/gcc-arm-none-eabi.cmake",
+      "cacheVariables": {
+        "OPENMRN_ENABLE_BLE": "OFF",
+        "OPENMRN_ENABLE_DCC": "OFF"
+      }
+    },
+    {
+      "name": "full",
+      "displayName": "Full Build",
+      "description": "Build with all optional modules enabled (BLE and DCC)",
+      "binaryDir": "${sourceDir}/build-full",
+      "toolchainFile": "${sourceDir}/gcc-arm-none-eabi.cmake",
+      "cacheVariables": {
+        "OPENMRN_ENABLE_BLE": "ON",
+        "OPENMRN_ENABLE_DCC": "ON"
+      }
+    },
+    {
+      "name": "dcc-only",
+      "displayName": "DCC Only",
+      "description": "Build with DCC support but without BLE",
+      "binaryDir": "${sourceDir}/build-dcc",
+      "toolchainFile": "${sourceDir}/gcc-arm-none-eabi.cmake",
+      "cacheVariables": {
+        "OPENMRN_ENABLE_BLE": "OFF",
+        "OPENMRN_ENABLE_DCC": "ON"
+      }
+    },
+    {
+      "name": "ble-only",
+      "displayName": "BLE Only",
+      "description": "Build with BLE support but without DCC",
+      "binaryDir": "${sourceDir}/build-ble",
+      "toolchainFile": "${sourceDir}/gcc-arm-none-eabi.cmake",
+      "cacheVariables": {
+        "OPENMRN_ENABLE_BLE": "ON",
+        "OPENMRN_ENABLE_DCC": "OFF"
+      }
+    }
+  ]
+}

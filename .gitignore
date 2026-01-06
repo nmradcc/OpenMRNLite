@@ -8,6 +8,7 @@ install_manifest.txt
 *.cmake
 !CMakeLists.txt
 !cmake/
+.clangd
 
 # Compiled object files
 *.o

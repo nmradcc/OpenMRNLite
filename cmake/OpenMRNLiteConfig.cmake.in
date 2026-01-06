@@ -1,5 +1,10 @@
 @PACKAGE_INIT@
 
+# OpenMRNLite CMake configuration file
+
+set(OPENMRNLITE_VERSION @PROJECT_VERSION@)
+
+# Include targets file
 include("${CMAKE_CURRENT_LIST_DIR}/OpenMRNLiteTargets.cmake")
 
 check_required_components(OpenMRNLite)
