@@ -2,7 +2,6 @@
 
 #include "OpenMRNLite_client.h"
 #include "main.h"
-//#include "tx_api.h"
 
 #include <OpenMRNLite.h>
 
