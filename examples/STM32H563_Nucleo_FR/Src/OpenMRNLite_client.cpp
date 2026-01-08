@@ -14,7 +14,7 @@ static constexpr uint64_t NODE_ID = UINT64_C(0x050101011824);
 
 extern "C" {
 
-void OpenMRNLite_client_Entry(unsigned long thread_input)
+void OpenMRNLite_client_Entry(void *thread_input)
 {
     // Initialize OpenMRNLite here
     

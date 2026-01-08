@@ -8,11 +8,16 @@
  * @date 20 December 2025
  */
 
-#ifdef USING_FREERTOS
+#if defined(OPENMRN_FEATURE_RTOS_FREERTOS) || defined(USING_FREERTOS) || defined(__FreeRTOS__)
 
 #include "os/os.h"
 #include "rtos_includes.h"
 #include <stdlib.h>
+
+/** Captures point of death (line). */
+int g_death_lineno;
+/** Captures point of death (file). */
+const char* g_death_file;
 
 // Thread entry wrapper structure
 typedef struct {
@@ -220,7 +225,7 @@ void os_mq_send_freertos(os_mq_t queue, const void *data)
 
 int os_mq_timedsend_freertos(os_mq_t queue, const void *data, long long timeout)
 {
-    portTickType ticks = NSEC_TO_TICK(timeout);
+    TickType_t ticks = NSEC_TO_TICK(timeout);
     
     if (xQueueSend(queue, data, ticks) != pdTRUE)
     {
@@ -236,7 +241,7 @@ void os_mq_receive_freertos(os_mq_t queue, void *data)
 
 int os_mq_timedreceive_freertos(os_mq_t queue, void *data, long long timeout)
 {
-    portTickType ticks = NSEC_TO_TICK(timeout);
+    TickType_t ticks = NSEC_TO_TICK(timeout);
 
     if (xQueueReceive(queue, data, ticks) != pdTRUE)
     {
@@ -247,7 +252,7 @@ int os_mq_timedreceive_freertos(os_mq_t queue, void *data, long long timeout)
 
 int os_mq_send_from_isr_freertos(os_mq_t queue, const void *data, int *woken)
 {
-    portBASE_TYPE local_woken;
+    BaseType_t local_woken = pdFALSE;
     if (xQueueSendFromISR(queue, data, &local_woken) != pdTRUE)
     {
         return OS_MQ_FULL;
@@ -263,7 +268,7 @@ int os_mq_is_full_from_isr_freertos(os_mq_t queue)
 
 int os_mq_receive_from_isr_freertos(os_mq_t queue, void *data, int *woken)
 {
-    portBASE_TYPE local_woken;
+    BaseType_t local_woken = pdFALSE;
     if (xQueueReceiveFromISR(queue, data, &local_woken) != pdTRUE)
     {
         return OS_MQ_EMPTY;

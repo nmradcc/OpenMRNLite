@@ -14,6 +14,13 @@
 #include "rtos_includes.h"
 #include <stdlib.h>
 
+
+/** Captures point of death (line). */
+int g_death_lineno;
+/** Captures point of death (file). */
+const char* g_death_file;
+
+
 // Thread entry wrapper structure
 typedef struct {
     void *(*user_entry)(void *);
@@ -110,6 +117,17 @@ int os_mutex_unlock_cmsis(os_mutex_t *mutex)
     return (status == osOK) ? 0 : -1;
 }
 
+int os_mutex_destroy_cmsis(os_mutex_t *mutex)
+{
+    if (mutex->mutex != NULL)
+    {
+        osStatus_t status = osMutexDelete(mutex->mutex);
+        mutex->mutex = NULL;
+        return (status == osOK) ? 0 : -1;
+    }
+    return 0;
+}
+
 int os_sem_init_cmsis(os_sem_t *sem, unsigned int value)
 {
     const osSemaphoreAttr_t attr = {
@@ -133,6 +151,17 @@ int os_sem_post_cmsis(os_sem_t *sem)
 {
     osStatus_t status = osSemaphoreRelease(sem->sem);
     return (status == osOK) ? 0 : -1;
+}
+
+int os_sem_destroy_cmsis(os_sem_t *sem)
+{
+    if (sem->sem != NULL)
+    {
+        osStatus_t status = osSemaphoreDelete(sem->sem);
+        sem->sem = NULL;
+        return (status == osOK) ? 0 : -1;
+    }
+    return 0;
 }
 
 int os_sem_timedwait_cmsis(os_sem_t *sem, long long timeout_nsec)

@@ -49,6 +49,14 @@
 #include "FreeRTOS.h"
 #include "task.h"
 
+#elif defined(OPENMRN_FEATURE_RTOS_THREADX)
+// ThreadX build: include ThreadX API, avoid POSIX headers
+#include "tx_api.h"
+
+#elif defined(OPENMRN_FEATURE_RTOS_CMSIS_V2)
+// CMSIS-RTOS v2 build: include CMSIS headers, avoid POSIX headers
+#include "cmsis_os2.h"
+
 #else
 
 #include <sys/select.h>

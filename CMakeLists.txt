@@ -84,15 +84,17 @@ if(OPENMRN_RTOS STREQUAL "ThreadX")
     # Exclude MDNS.cpp and OS.cpp which require full select() support (OSSelectWakeup has ThreadX support)
     list(FILTER OS_SOURCES EXCLUDE REGEX ".*/(MDNS|OS)\\.cpp$")
 elseif(OPENMRN_RTOS STREQUAL "CMSIS_RTOS_V2")
-    file(GLOB OS_SOURCES src/os/*.cpp src/os/cmsis_rtos2_impl.c)
+    # CMSIS-RTOS v2: include OS shims and C implementations for time and buffer allocation
+    file(GLOB OS_SOURCES src/os/*.cpp src/os/cmsis_rtos2_impl.c src/os/cmsis_time.c src/os/stack_malloc.c)
     list(FILTER OS_SOURCES EXCLUDE REGEX ".*/(MDNS|OSSelectWakeup|OS)\\.cpp$")
 elseif(OPENMRN_RTOS STREQUAL "FreeRTOS")
-    file(GLOB OS_SOURCES src/os/*.cpp src/os/freertos_impl.c)
+    # FreeRTOS: include OS shims and C implementations for time and malloc wrappers
+    file(GLOB OS_SOURCES src/os/*.cpp src/os/freertos_impl.c src/os/freertos_time.c src/os/stack_malloc.c)
     # Exclude MDNS.cpp and OSSelectWakeup.cpp which are not compatible with embedded FreeRTOS
     list(FILTER OS_SOURCES EXCLUDE REGEX ".*/(MDNS|OSSelectWakeup)\\.cpp$")
 else() 
-    # No RTOS - minimal OS layer
-    file(GLOB OS_SOURCES src/os/*.cpp src/os/os.c)
+    # No RTOS - minimal OS layer without POSIX dependencies
+    file(GLOB OS_SOURCES src/os/*.cpp src/os/stack_malloc.c)
     list(FILTER OS_SOURCES EXCLUDE REGEX ".*/(MDNS|OSSelectWakeup|OS)\\.cpp$")
 endif()
 
@@ -188,6 +190,7 @@ elseif(OPENMRN_RTOS STREQUAL "CMSIS_RTOS_V2")
 elseif(OPENMRN_RTOS STREQUAL "FreeRTOS")
     target_compile_definitions(OpenMRNLite PUBLIC
         OPENMRN_FEATURE_MUTEX_FREERTOS=1
+        OPENMRN_FEATURE_RTOS_FREERTOS=1
         __FreeRTOS__=1
     )
     message(STATUS "RTOS: FreeRTOS")

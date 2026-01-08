@@ -40,6 +40,19 @@ extern "C" {
 }
 #endif
 
+#if defined(OPENMRN_FEATURE_RTOS_FREERTOS)
+extern "C" {
+#include "FreeRTOS.h"
+#include "task.h"
+}
+#endif
+
+#if defined(OPENMRN_FEATURE_RTOS_CMSIS_V2)
+extern "C" {
+#include "cmsis_os2.h"
+}
+#endif
+
 void empty_signal_handler(int)
 {
 }

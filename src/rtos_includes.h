@@ -39,11 +39,12 @@
 // Detect which RTOS is being used
 #if defined(OPENMRN_FEATURE_RTOS_FREERTOS)
     #define USING_FREERTOS 1
-    #include <freertos/FreeRTOS.h>
-    #include <freertos/task.h>
-    #include <freertos/semphr.h>
-    #include <freertos/queue.h>
-    #define NSEC_TO_TICK(ns) ((ns) >> NSEC_TO_TICK_SHIFT)
+    #include "FreeRTOS.h"
+    #include "task.h"
+    #include "semphr.h"
+    #include "queue.h"
+    // Convert nanoseconds to FreeRTOS ticks
+    #define NSEC_TO_TICK(ns) ((TickType_t)(((ns) * (uint64_t)configTICK_RATE_HZ) / 1000000000ULL))
 
 #elif defined(OPENMRN_FEATURE_RTOS_THREADX)
     #define USING_THREADX 1

@@ -41,7 +41,7 @@
 #include "os/os.h"
 
 #if defined(OPENMRN_FEATURE_RTOS_FREERTOS)
-#include <freertos/event_groups.h>
+#include "event_groups.h"
 #endif
 
 /** This class provides a threading API.
@@ -666,7 +666,7 @@ public:
     {
         BaseType_t e_clear = clear ? pdTRUE : pdFALSE;
         BaseType_t e_test = test ? pdTRUE : pdFALSE;
-        TickType_t e_timeout = timeout == OPENMRN_OS_WAIT_FOREVER ? portMAX_DELAY : timeout >> NSEC_TO_TICK_SHIFT;
+        TickType_t e_timeout = timeout == OPENMRN_OS_WAIT_FOREVER ? portMAX_DELAY : NSEC_TO_TICK(timeout);
 
         OSEventType bits = xEventGroupWaitBits(event, mask, e_clear, e_test, e_timeout);
 

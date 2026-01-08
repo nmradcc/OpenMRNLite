@@ -11,12 +11,12 @@
 #ifndef _OS_FREERTOS_IMPL_H_
 #define _OS_FREERTOS_IMPL_H_
 
-#ifdef USING_FREERTOS
+#if defined(OPENMRN_FEATURE_RTOS_FREERTOS) || defined(USING_FREERTOS) || defined(__FreeRTOS__)
 
-#include <freertos/FreeRTOS.h>
-#include <freertos/task.h>
-#include <freertos/semphr.h>
-#include <freertos/queue.h>
+#include "FreeRTOS.h"
+#include "task.h"
+#include "semphr.h"
+#include "queue.h"
 
 #define __FreeRTOS__ 1
 
@@ -34,17 +34,17 @@
 #define OPENMRN_FEATURE_THREAD_FREERTOS 1
 
 /// Compiles the FreeRTOS event group based ::select() implementation.
-#define OPENMRN_FEATURE_DEVICE_SELECT 0 // Disabled for now
+//#define OPENMRN_FEATURE_DEVICE_SELECT 1 // Disabled for now
 
 /// Adds implementations for ::read ::write etc, with fd table.
-#define OPENMRN_FEATURE_DEVTAB 0 // Disabled for now
+//#define OPENMRN_FEATURE_DEVTAB 1 // Disabled for now
 
 /// Adds struct reent pointer to the FreeRTOS Task Priv structure and swaps it
 /// in when the tasks are swapped in.
 #define OPENMRN_FEATURE_REENT 1
 
 /// Adds support for FD based CAN interfaces.
-#define OPENMRN_FEATURE_FD_CAN_DEVICE 1
+//#define OPENMRN_FEATURE_FD_CAN_DEVICE 1
 
 /// Compiles support for BSD sockets API.
 #define OPENMRN_FEATURE_BSD_SOCKETS 1
