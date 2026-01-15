@@ -3,6 +3,7 @@
 #include "OpenMRNLite_server.h"
 #include "main.h"
 #include "app_azure_rtos.h"
+#include "FdCanBridge.h"
 
 #include <OpenMRNLite.h>
 
@@ -11,6 +12,9 @@
 static constexpr uint64_t NODE_ID = UINT64_C(0x050101011825);
 
 static OpenMRN openmrn(NODE_ID);
+
+// External function to setup the CAN bridge
+extern void setup_can_bridge(OpenMRN *openmrn);
 
 namespace openlcb
 {
@@ -32,14 +36,19 @@ extern "C" {
 
 void OpenMRNLite_server_Entry(ULONG thread_input)
 {
-    // Initialize OpenMRNLite here
+    // Initialize CAN bridge to connect HAL to OpenMRN
+    setup_can_bridge(&openmrn);
     
+    // Start the OpenMRN stack
+    openmrn.begin();
+    
+    // Main processing loop
     while (1)
     {
         // Main OpenMRNLite processing loop
         openmrn.loop();
         BSP_LED_Toggle(LED_RED);
-        tx_thread_sleep(200);
+        tx_thread_sleep(20); // 20ms at 1000 Hz tick rate
     }
 }
 

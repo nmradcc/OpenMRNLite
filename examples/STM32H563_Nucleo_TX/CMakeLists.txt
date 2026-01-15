@@ -52,6 +52,7 @@ target_link_directories(${CMAKE_PROJECT_NAME} PRIVATE
 target_sources(${CMAKE_PROJECT_NAME} PRIVATE
     # Add user sources here
     Src/OpenMRNLite_client.cpp
+    Src/FdCanBridge.cpp
 #    Src/OpenMRNLite_server.cpp
 )
 

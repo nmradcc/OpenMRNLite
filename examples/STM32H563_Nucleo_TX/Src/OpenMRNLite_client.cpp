@@ -3,6 +3,7 @@
 #include "OpenMRNLite_client.h"
 #include "main.h"
 #include "app_azure_rtos.h"
+#include "FdCanBridge.h"
 
 #include <OpenMRNLite.h>
 
@@ -28,6 +29,8 @@ extern const SimpleNodeStaticValues SNIP_STATIC_DATA = {
 extern const char *const SNIP_DYNAMIC_FILENAME = nullptr;
 } // namespace openlcb
 
+// External function to setup the CAN bridge
+extern void setup_can_bridge(OpenMRN *openmrn);
 
 #include "openlcb/BroadcastTimeAlarm.hxx"
 #include "openlcb/BroadcastTimeClient.hxx"
@@ -116,21 +119,24 @@ void check_server()
 
 
 
-
-
 extern "C" {
 void OpenMRNLite_client_Entry(ULONG thread_input)
 {
-//TODO:    openmrn.add_can_port(&CanDriver);
+    // Initialize CAN bridge to connect HAL to OpenMRN
+    setup_can_bridge(&openmrn);
+    
+    // Start the OpenMRN stack
     openmrn.begin();
     time_client.update_subscribe_add(&update);
+    
+    // Main processing loop
     while (1)
     {
         // Main OpenMRNLite processing loop
         openmrn.loop();
         check_server();
         BSP_LED_Toggle(LED_YELLOW);
-        tx_thread_sleep(200);
+        tx_thread_sleep(20); // 20ms at 1000 Hz tick rate
     }
 }
 
