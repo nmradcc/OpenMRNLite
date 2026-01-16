@@ -67,6 +67,9 @@ public:
     /// Destructor.
     ~BroadcastTimeServer();
 
+    /// Test helper: subscribe a specific minute to force broadcast scheduling.
+    void subscribe_minute(int hour, int min);
+
     /// Has a time server been detected?
     /// @return true if a time server has been detected, else false
     bool is_server_detected() override

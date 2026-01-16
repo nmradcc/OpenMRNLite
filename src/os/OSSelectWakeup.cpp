@@ -62,7 +62,7 @@ int OSSelectWakeup::select(int nfds, fd_set *readfds,
                            long long deadline_nsec)
 {
 #if defined(OPENMRN_FEATURE_RTOS_THREADX)
-    // ThreadX doesn't support select(), so we implement a simple sleep-based version
+    // ThreadX doesn't support select(), so we implement a semaphore-based version
     {
         AtomicHolder l(this);
         inSelect_ = true;
@@ -72,12 +72,33 @@ int OSSelectWakeup::select(int nfds, fd_set *readfds,
         }
     }
     
+    UINT status;
     if (deadline_nsec > 0)
     {
-        // Convert nanoseconds to ThreadX ticks (1000 ticks per second)
-        unsigned long ticks = (deadline_nsec + 999999) / 1000000; // Convert to milliseconds (ticks)
+        // Convert nanoseconds to milliseconds, then to ThreadX ticks
+        // Default ThreadX timer tick = 10ms = 100 Hz
+        unsigned long ms = deadline_nsec / 1000000;
+        if (ms == 0) ms = 1;  // At least 1ms sleep
+        unsigned long ticks = (ms + 9) / 10;  // Round up to ticks (10ms per tick)
         if (ticks == 0) ticks = 1;
-        tx_thread_sleep(ticks);
+        status = tx_semaphore_get(&wakeupSem_.sem, ticks);
+    }
+    else
+    {
+        status = tx_semaphore_get(&wakeupSem_.sem, TX_NO_WAIT);
+    }
+    
+    if (status == TX_SUCCESS)
+    {
+        printf("[WAKEUP] Executor woken up\r\n");
+    }
+    else if (status == TX_NO_INSTANCE)
+    {
+        // Timeout - expected behavior
+    }
+    else
+    {
+        printf("[SELECT] Semaphore error: %u\r\n", status);
     }
     
     {

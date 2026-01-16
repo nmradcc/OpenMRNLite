@@ -203,6 +203,9 @@ void *ExecutorBase::entry()
     started_ = 1;
     sequence_ = 0;
     selectHelper_.lock_to_thread();
+    printf("[EXECUTOR] Entry function started, thread handle = %p\r\n", (void*)OSThread::get_handle());
+    uint32_t loop_count = 0;
+    fflush(stdout);
     /* wait for messages to process */
     for (; /* forever */;)
     {
@@ -211,6 +214,12 @@ void *ExecutorBase::entry()
         if (!selectPrescaler_ || ((msg = next(&priority)) == nullptr))
         {
             long long wait_length = activeTimers_.get_next_timeout();
+            if (++loop_count % 50 == 0)
+            {
+                printf("[EXECUTOR] Loop %lu: seq=%d, timers_empty=%d, timeout=%lld ns\r\n", 
+                       (unsigned long)loop_count, sequence_, (int)activeTimers_.empty(), wait_length);
+                fflush(stdout);
+            }
             wait_with_select(wait_length);
             selectPrescaler_ = config_executor_select_prescaler();
             msg = next(&priority);

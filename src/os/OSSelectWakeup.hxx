@@ -124,7 +124,9 @@ public:
             pthread_kill(thread_, WAKEUP_SIG);
 #elif defined(OPENMRN_FEATURE_RTOS_THREADX)
             // ThreadX: Post to wakeup semaphore to interrupt any sleep/wait
+            printf("[WAKEUP] Posting semaphore\r\n");
             os_sem_post(&wakeupSem_);
+            printf("[WAKEUP] Semaphore posted\r\n");
 #elif !defined(OPENMRN_FEATURE_SINGLE_THREADED)
             DIE("need wakeup code");
 #endif

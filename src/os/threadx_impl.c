@@ -37,9 +37,13 @@ static void thread_entry_wrapper(ULONG thread_input)
 int os_thread_create_threadx(os_thread_t *thread, const char *name, int priority,
                              size_t stack_size, void *(*entry)(void *), void *arg)
 {
+    printf("[THREAD] Creating thread '%s' with priority=%d, stack_size=%lu\r\n", 
+           name ? name : "unnamed", priority, (unsigned long)stack_size);
+    
     // Allocate thread control block
     TX_THREAD *tx_thread = (TX_THREAD *)malloc(sizeof(TX_THREAD));
     if (!tx_thread) {
+        printf("[THREAD] ERROR: Failed to allocate thread control block\r\n");
         return -1;
     }
     
@@ -51,16 +55,21 @@ int os_thread_create_threadx(os_thread_t *thread, const char *name, int priority
         stack_size = TX_MINIMUM_STACK;
     }
     
+    printf("[THREAD] Final stack size: %lu bytes\r\n", (unsigned long)stack_size);
+    
     // Allocate stack
     void *stack = malloc(stack_size);
     if (!stack) {
+        printf("[THREAD] ERROR: Failed to allocate stack (%lu bytes)\r\n", (unsigned long)stack_size);
         free(tx_thread);
         return -1;
     }
+    printf("[THREAD] Stack allocated at %p\r\n", stack);
     
     // Create wrapper for entry point
     thread_wrapper_t *wrapper = (thread_wrapper_t *)malloc(sizeof(thread_wrapper_t));
     if (!wrapper) {
+        printf("[THREAD] ERROR: Failed to allocate thread wrapper\r\n");
         free(stack);
         free(tx_thread);
         return -1;
@@ -72,6 +81,8 @@ int os_thread_create_threadx(os_thread_t *thread, const char *name, int priority
     UINT tx_priority = (priority <= 0) ? 16 : priority;
     if (tx_priority > 31) tx_priority = 31;
     
+    printf("[THREAD] Calling tx_thread_create with priority=%d\r\n", tx_priority);
+    
     // Create ThreadX thread
     UINT status = tx_thread_create(tx_thread, (CHAR *)name, thread_entry_wrapper,
                                    (ULONG)wrapper, stack, stack_size,
@@ -80,13 +91,16 @@ int os_thread_create_threadx(os_thread_t *thread, const char *name, int priority
     
     if (status != TX_SUCCESS) {
         // Thread creation failed - log and cleanup
-        printf("ERROR: tx_thread_create failed with status=%d for thread '%s' (stack_size=%zu, priority=%d)\r\n",
-               status, name ? name : "?", stack_size, tx_priority);
+        printf("[THREAD] ERROR: tx_thread_create failed with status=%d for thread '%s'\r\n",
+               status, name ? name : "?");
         free(wrapper);
         free(stack);
         free(tx_thread);
         return -1;
     }
+    
+    printf("[THREAD] SUCCESS: Thread '%s' created with handle %p\r\n", 
+           name ? name : "unnamed", (void *)tx_thread);
     
     *thread = tx_thread;
     return 0;

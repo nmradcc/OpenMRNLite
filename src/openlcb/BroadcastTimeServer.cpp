@@ -805,6 +805,11 @@ BroadcastTimeServer::~BroadcastTimeServer()
     delete time_;
 }
 
+void BroadcastTimeServer::subscribe_minute(int hour, int min)
+{
+    alarm_->subscribe(hour, min);
+}
+
 bool BroadcastTimeServer::is_shutdown()
 {
     return is_terminated() && alarm_->is_shutdown() && sync_->is_shutdown();
