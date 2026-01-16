@@ -64,6 +64,164 @@ static void MX_ICACHE_Init(void);
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
 
+static uint8_t can_test_direction = 0;  /* 0 = CAN1 to CAN2, 1 = CAN2 to CAN1 */
+
+/**
+  * @brief  Perform a simple CAN loopback test (bidirectional)
+  * @param  None
+  * @retval None
+  */
+static void CAN_LoopbackTest(void)
+{
+  HAL_StatusTypeDef status;
+  FDCAN_TxHeaderTypeDef TxHeader;
+  FDCAN_RxHeaderTypeDef RxHeader;
+  uint8_t TxData[8] = {0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08};
+  uint8_t RxData[8] = {0};
+  uint32_t timeout = 0;
+  uint8_t test_passed = 0;
+  uint8_t i;
+  FDCAN_HandleTypeDef *TxHandle;
+  FDCAN_HandleTypeDef *RxHandle;
+  const char *TxName;
+  const char *RxName;
+
+  printf("\n\r========== CAN Loopback Test Start ==========\n\r");
+
+  /* Determine direction */
+  if (can_test_direction == 0)
+  {
+    TxHandle = &hfdcan1;
+    RxHandle = &hfdcan2;
+    TxName = "CAN1";
+    RxName = "CAN2";
+    printf("Direction: CAN1 (TX) -> CAN2 (RX)\n\r");
+  }
+  else
+  {
+    TxHandle = &hfdcan2;
+    RxHandle = &hfdcan1;
+    TxName = "CAN2";
+    RxName = "CAN1";
+    printf("Direction: CAN2 (TX) -> CAN1 (RX)\n\r");
+  }
+
+  /* Start both FDCAN controllers */
+  HAL_FDCAN_Start(&hfdcan1);
+  HAL_FDCAN_Start(&hfdcan2);
+
+  /* Configure TX header */
+  TxHeader.Identifier = 0x123;                  /* Test ID */
+  TxHeader.IdType = FDCAN_STANDARD_ID;
+  TxHeader.TxFrameType = FDCAN_DATA_FRAME;
+  TxHeader.DataLength = FDCAN_DLC_BYTES_8;
+  TxHeader.ErrorStateIndicator = FDCAN_ESI_ACTIVE;
+  TxHeader.BitRateSwitch = FDCAN_BRS_OFF;
+  TxHeader.FDFormat = FDCAN_CLASSIC_CAN;
+  TxHeader.TxEventFifoControl = FDCAN_NO_TX_EVENTS;
+  TxHeader.MessageMarker = 0;
+
+  /* Add a filter to RX handle to accept the test message */
+  FDCAN_FilterTypeDef sFilterConfig;
+  sFilterConfig.IdType = FDCAN_STANDARD_ID;
+  sFilterConfig.FilterIndex = 0;
+  sFilterConfig.FilterType = FDCAN_FILTER_MASK;
+  sFilterConfig.FilterConfig = FDCAN_FILTER_TO_RXFIFO0;
+  sFilterConfig.FilterID1 = 0x123;
+  sFilterConfig.FilterID2 = 0x7FF;  /* Mask for all 11-bit identifiers */
+  HAL_FDCAN_ConfigFilter(RxHandle, &sFilterConfig);
+
+  /* Transmit test message */
+  status = HAL_FDCAN_AddMessageToTxFifoQ(TxHandle, &TxHeader, TxData);
+  if (status != HAL_OK)
+  {
+    printf("ERROR: Failed to add message to %s TX FIFO\n\r", TxName);
+    printf("Status: %d\n\r", status);
+    goto test_end;
+  }
+  printf("%s TX: Message sent (ID: 0x%03X, Data: ", TxName, TxHeader.Identifier);
+  for (i = 0; i < 8; i++)
+  {
+    printf("%02X ", TxData[i]);
+  }
+  printf(")\n\r");
+
+  /* Wait for message reception with timeout */
+  timeout = 0;
+  while (HAL_FDCAN_GetRxFifoFillLevel(RxHandle, FDCAN_RX_FIFO0) == 0 && timeout < 1000)
+  {
+    HAL_Delay(1);
+    timeout++;
+  }
+
+  if (HAL_FDCAN_GetRxFifoFillLevel(RxHandle, FDCAN_RX_FIFO0) > 0)
+  {
+    /* Receive the message */
+    status = HAL_FDCAN_GetRxMessage(RxHandle, FDCAN_RX_FIFO0, &RxHeader, RxData);
+    if (status == HAL_OK)
+    {
+      printf("%s RX: Message received (ID: 0x%03X, Data: ", RxName, RxHeader.Identifier);
+      for (i = 0; i < 8; i++)
+      {
+        printf("%02X ", RxData[i]);
+      }
+      printf(")\n\r");
+
+      /* Verify the received message */
+      if (RxHeader.Identifier == TxHeader.Identifier)
+      {
+        test_passed = 1;
+        for (i = 0; i < 8; i++)
+        {
+          if (RxData[i] != TxData[i])
+          {
+            test_passed = 0;
+            break;
+          }
+        }
+      }
+
+      if (test_passed)
+      {
+        printf("\n\r*** CAN LOOPBACK TEST PASSED ***\n\r");
+        BSP_LED_On(LED_GREEN);
+        HAL_Delay(500);
+        BSP_LED_Off(LED_GREEN);
+      }
+      else
+      {
+        printf("\n\r*** CAN LOOPBACK TEST FAILED: Data Mismatch ***\n\r");
+        BSP_LED_On(LED_RED);
+        HAL_Delay(500);
+        BSP_LED_Off(LED_RED);
+      }
+    }
+    else
+    {
+      printf("ERROR: Failed to get message from %s RX FIFO\n\r", RxName);
+      BSP_LED_On(LED_RED);
+      HAL_Delay(500);
+      BSP_LED_Off(LED_RED);
+    }
+  }
+  else
+  {
+    printf("ERROR: No message received on %s (timeout)\n\r", RxName);
+    BSP_LED_On(LED_RED);
+    HAL_Delay(500);
+    BSP_LED_Off(LED_RED);
+  }
+
+test_end:
+  /* Toggle direction for next test */
+  can_test_direction = (can_test_direction == 0) ? 1 : 0;
+  
+  /* Stop both FDCAN controllers */
+  HAL_FDCAN_Stop(&hfdcan1);
+  HAL_FDCAN_Stop(&hfdcan2);
+  printf("========== CAN Loopback Test End ==========\n\r\n\r");
+}
+
 /* USER CODE END 0 */
 
 /**
@@ -140,11 +298,8 @@ int main(void)
     {
       /* Update button state */
       BspButtonState = BUTTON_RELEASED;
-      /* -- Sample board code to toggle leds ---- */
-      BSP_LED_Toggle(LED_GREEN);
-      BSP_LED_Toggle(LED_YELLOW);
-      BSP_LED_Toggle(LED_RED);
-      /* ..... Perform your action ..... */
+      /* Perform CAN loopback test */
+      CAN_LoopbackTest();
     }
     /* USER CODE END WHILE */
 
