@@ -306,6 +306,7 @@ int __attribute__((weak)) os_thread_create_helper(os_thread_t *thread,
 }
 #endif // OPENMRN_FEATURE_THREAD_FREERTOS
 
+#if !defined(OPENMRN_FEATURE_RTOS_THREADX)
 /** Create a thread.
  * @param thread handle to the created thread
  * @param name name of thread, NULL for an auto generated name
@@ -429,6 +430,7 @@ int os_thread_create(os_thread_t *thread, const char *name, int priority,
     return result;
 #endif // OPENMRN_FEATURE_THREAD_PTHREAD
 }
+#endif // !OPENMRN_FEATURE_RTOS_THREADX
 #endif // !OPENMRN_FEATURE_SINGLE_THREADED
 
 /// Implement this function to read timing more accurately than 1 msec in

@@ -27,6 +27,9 @@ void setup_can_bridge(openmrn_arduino::OpenMRN *openmrn);
 /// Get the bridge instance for direct access if needed
 FdCanBridge* get_can_bridge();
 
+/// Test function to send a frame through the OpenMRN hub
+void test_send_can_frame(openmrn_arduino::OpenMRN *openmrn);
+
 #ifdef __cplusplus
 }
 #endif

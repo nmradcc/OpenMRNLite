@@ -13,13 +13,16 @@ static constexpr uint64_t NODE_ID = UINT64_C(0x050101011824);
 
 static OpenMRN openmrn(NODE_ID);
 
+// External function to setup the CAN bridge
+extern void setup_can_bridge(OpenMRN *openmrn);
+
 namespace openlcb
 {
 /// These definitions tell how the Node will appear on the OpenLCB bus for a
 /// network browser.
 extern const SimpleNodeStaticValues SNIP_STATIC_DATA = {
     4,
-    "OpenMRN",
+    "NMRA",
     "CAN-Node STM32H563_NUCLEO client",
     "STM32H563 NUCLEO",
     "1.00"
@@ -122,6 +125,9 @@ void check_server()
 extern "C" {
 void OpenMRNLite_client_Entry(ULONG thread_input)
 {
+
+
+#if 0
     // Initialize CAN bridge to connect HAL to OpenMRN
     setup_can_bridge(&openmrn);
     
@@ -138,6 +144,26 @@ void OpenMRNLite_client_Entry(ULONG thread_input)
         BSP_LED_Toggle(LED_YELLOW);
         tx_thread_sleep(20); // 20ms at 1000 Hz tick rate
     }
+#endif
+
+    // Initialize CAN bridge to connect HAL to OpenMRN
+    setup_can_bridge(&openmrn);
+    
+    // Start the OpenMRN stack
+    openmrn.begin();
+    openmrn.stack()->print_all_packets();
+    openmrn.start_executor_thread();
+
+    // Main processing loop
+    while (1)
+    {
+        // Main OpenMRNLite processing loop
+        openmrn.loop();
+        check_server();
+        BSP_LED_Toggle(LED_YELLOW);
+        tx_thread_sleep(20); // 20ms at 1000 Hz tick rate
+    }
+
 }
 
 } // extern "C"

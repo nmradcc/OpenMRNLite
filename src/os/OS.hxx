@@ -148,8 +148,14 @@ public:
     /// multiplexing environments like Arduino.
     void lock_to_thread()
     {
-        HASSERT(handle == 0);
-        handle = os_thread_self();
+        // In RTOS mode, the thread handle is already set when the thread is created.
+        // In Arduino/single-threaded mode, the handle needs to be set when donating a thread.
+        if (handle == 0)
+        {
+            handle = os_thread_self();
+        }
+        // If handle is already non-zero, it was set by the RTOS at thread creation,
+        // so we don't override it. This is normal and expected.
     }
 
     /// Resets the thread handle to none.

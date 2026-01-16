@@ -19,7 +19,7 @@ extern FDCAN_HandleTypeDef hfdcan1; // From main.c
 class FdCanBridge {
 public:
     FdCanBridge(FDCAN_HandleTypeDef *hfdcan, CanHubFlow *hub)
-        : hfdcan_(hfdcan), canHub_(hub), txPending_(false) {}
+        : hfdcan_(hfdcan), canHub_(hub), txPending_(false), writePort_(this) {}
     
     void init() {
         // Configure FDCAN to start receiving
@@ -38,6 +38,13 @@ public:
                 FDCAN_IT_TX_COMPLETE, 0) != HAL_OK) {
             Error_Handler();
         }
+        
+        // Register the write port with the CAN hub to receive outgoing frames
+        // DEBUG: Set breakpoint here to verify this is called
+        volatile bool registering = true;
+        canHub_->register_port(&writePort_);
+        registering = false; // Set breakpoint and check canHub_ is valid
+        (void)registering;
     }
     
     /// Call this from HAL RX interrupt callback
@@ -73,6 +80,8 @@ public:
                 
                 memcpy(frame->data, rxData, frame->can_dlc);
                 
+                // Skip our own write port to prevent loopback
+                b->data()->skipMember_ = &writePort_;
                 canHub_->send(b);
             }
         }
@@ -81,25 +90,12 @@ public:
     /// Call this from HAL TX complete interrupt callback
     void tx_interrupt_handler() {
         txPending_ = false;
+        // Notify the write port that we can transmit again
+        writePort_.notify();
     }
     
-    /// Poll this from the main loop to transmit frames from OpenMRN to HAL
-    void poll_tx() {
-        // If TX is still pending, don't try to send
-        if (txPending_) {
-            return;
-        }
-        
-        // Try to get a frame from the hub
-        // Note: This is a simplified approach. A proper implementation would
-        // use a flow-based approach, but that requires more OpenMRN infrastructure
-        
-        // For now, we'll check if there are any buffers to send
-        // This would need to be connected to the hub's output
-        // TODO: Implement proper TX flow integration
-    }
-    
-    /// Direct TX for testing - call with a can_frame
+    /// Transmit a frame via FDCAN hardware
+    /// @return true if frame was queued successfully
     bool try_tx_frame(const struct can_frame *frame) {
         if (txPending_) {
             return false;
@@ -138,11 +134,54 @@ public:
         
         return false;
     }
-    
+
 private:
+    friend class WritePort;
+    
+    /// State flow port for receiving frames from the OpenMRN hub
+    class WritePort : public CanHubPort
+    {
+    public:
+        WritePort(FdCanBridge *parent)
+            : CanHubPort(parent->canHub_->service())
+            , parent_(parent)
+        {
+        }
+
+        Action entry() override
+        {
+            // Attempt to transmit the frame
+            const struct can_frame &frame = message()->data()->frame();
+            
+            // DEBUG: Add breakpoint here to see frame details
+            volatile uint32_t can_id = IS_CAN_FRAME_EFF(frame) ? 
+                GET_CAN_FRAME_ID_EFF(frame) : GET_CAN_FRAME_ID(frame);
+            volatile uint8_t dlc = frame.can_dlc;
+            (void)can_id; // Prevent unused warning
+            (void)dlc;
+            
+            if (parent_->try_tx_frame(&frame)) {
+                // Frame queued successfully, wait for TX complete
+                return wait_and_call(STATE(tx_done));
+            } else {
+                // TX is busy, yield and retry later
+                return yield_and_call(STATE(entry));
+            }
+        }
+
+        Action tx_done()
+        {
+            return release_and_exit();
+        }
+
+    private:
+        FdCanBridge *parent_;
+    };
+
     FDCAN_HandleTypeDef *hfdcan_;
     CanHubFlow *canHub_;
     volatile bool txPending_;
+    WritePort writePort_;
 };
 
 static FdCanBridge *canBridge = nullptr;
@@ -172,6 +211,34 @@ void setup_can_bridge(openmrn_arduino::OpenMRN *openmrn) {
 /// Get the bridge instance for direct access if needed
 FdCanBridge* get_can_bridge() {
     return canBridge;
+}
+
+/// Test function to send a frame through the OpenMRN hub
+void test_send_can_frame(openmrn_arduino::OpenMRN *openmrn) {
+    if (!openmrn || !openmrn->stack()) return;
+    
+    // DEBUG: Set breakpoint here
+    volatile bool sending = true;
+    
+    auto *b = openmrn->stack()->can_hub()->alloc();
+    if (b) {
+        struct can_frame *frame = b->data()->mutable_frame();
+        
+        // Create a test frame: standard ID 0x123, 8 bytes of data
+        CLR_CAN_FRAME_EFF(*frame);
+        SET_CAN_FRAME_ID(*frame, 0x123);
+        frame->can_dlc = 8;
+        for (int i = 0; i < 8; i++) {
+            frame->data[i] = i;
+        }
+        
+        // Don't set skipMember - we want this to go to our WritePort
+        b->data()->skipMember_ = nullptr;
+        
+        openmrn->stack()->can_hub()->send(b);
+        sending = false; // Breakpoint: verify send was called
+    }
+    (void)sending;
 }
 
 } // extern "C"

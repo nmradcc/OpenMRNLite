@@ -85,6 +85,13 @@ static inline os_thread_t os_thread_self(void)
     return os_thread_self_threadx();
 }
 
+static inline int os_thread_create(os_thread_t *thread, const char *name,
+                                    int priority, size_t stack_size,
+                                    void *(*entry)(void *), void *arg)
+{
+    return os_thread_create_threadx(thread, name, priority, stack_size, entry, arg);
+}
+
 static inline int os_thread_get_priority(os_thread_t thread)
 {
     UINT priority;

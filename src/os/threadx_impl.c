@@ -43,6 +43,14 @@ int os_thread_create_threadx(os_thread_t *thread, const char *name, int priority
         return -1;
     }
     
+    // Enforce minimum stack size
+    if (stack_size == 0) {
+        stack_size = 2048;  // Default stack size for STM32
+    }
+    if (stack_size < TX_MINIMUM_STACK) {
+        stack_size = TX_MINIMUM_STACK;
+    }
+    
     // Allocate stack
     void *stack = malloc(stack_size);
     if (!stack) {
@@ -71,6 +79,9 @@ int os_thread_create_threadx(os_thread_t *thread, const char *name, int priority
                                    TX_AUTO_START);
     
     if (status != TX_SUCCESS) {
+        // Thread creation failed - log and cleanup
+        printf("ERROR: tx_thread_create failed with status=%d for thread '%s' (stack_size=%zu, priority=%d)\r\n",
+               status, name ? name : "?", stack_size, tx_priority);
         free(wrapper);
         free(stack);
         free(tx_thread);

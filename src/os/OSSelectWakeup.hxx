@@ -83,6 +83,9 @@ public:
         thread_ = os_thread_self();
 #if OPENMRN_FEATURE_DEVICE_SELECT
         Device::select_insert(&selectInfo_);
+#elif defined(OPENMRN_FEATURE_RTOS_THREADX)
+        // Initialize wakeup semaphore for ThreadX
+        os_sem_init(&wakeupSem_, 0);
 #elif OPENMRN_HAVE_PSELECT
         // Blocks SIGUSR1 in the signal mask of the current thread.
         sigset_t usrmask;
@@ -119,6 +122,9 @@ public:
             Device::select_wakeup(&copy);
 #elif OPENMRN_HAVE_PSELECT
             pthread_kill(thread_, WAKEUP_SIG);
+#elif defined(OPENMRN_FEATURE_RTOS_THREADX)
+            // ThreadX: Post to wakeup semaphore to interrupt any sleep/wait
+            os_sem_post(&wakeupSem_);
 #elif !defined(OPENMRN_FEATURE_SINGLE_THREADED)
             DIE("need wakeup code");
 #endif
@@ -184,6 +190,10 @@ private:
     os_thread_t thread_;
 #if OPENMRN_FEATURE_DEVICE_SELECT
     Device::SelectInfo selectInfo_;
+#endif
+#if defined(OPENMRN_FEATURE_RTOS_THREADX)
+    /// Semaphore used for waking up the executor thread
+    os_sem_t wakeupSem_;
 #endif
 #if OPENMRN_HAVE_PSELECT
     /// Original signal mask. Used for pselect to reenable the signal we'll be
