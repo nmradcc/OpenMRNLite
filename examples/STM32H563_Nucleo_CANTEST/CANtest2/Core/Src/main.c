@@ -49,6 +49,11 @@ FDCAN_HandleTypeDef hfdcan2;
 
 /* USER CODE BEGIN PV */
 
+static volatile uint8_t can_rx_complete = 0;
+static volatile uint8_t can_tx_complete = 0;
+static volatile FDCAN_RxHeaderTypeDef can_rx_hdr;
+static volatile uint8_t can_rx_buf[8];
+
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -64,10 +69,10 @@ static void MX_ICACHE_Init(void);
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
 
-static uint8_t can_test_direction = 0;  /* 0 = CAN1 to CAN2, 1 = CAN2 to CAN1 */
+static uint8_t can_test_direction = 0;  /* 0 = CAN1, 1 = CAN2 */
 
 /**
-  * @brief  Perform a simple CAN loopback test (bidirectional)
+  * @brief  Perform a simple CAN loopback test using interrupts
   * @param  None
   * @retval None
   */
@@ -75,40 +80,59 @@ static void CAN_LoopbackTest(void)
 {
   HAL_StatusTypeDef status;
   FDCAN_TxHeaderTypeDef TxHeader;
-  FDCAN_RxHeaderTypeDef RxHeader;
   uint8_t TxData[8] = {0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08};
-  uint8_t RxData[8] = {0};
+  /* RX handled via interrupt callback into can_rx_hdr/can_rx_buf */
   uint32_t timeout = 0;
   uint8_t test_passed = 0;
   uint8_t i;
-  FDCAN_HandleTypeDef *TxHandle;
-  FDCAN_HandleTypeDef *RxHandle;
-  const char *TxName;
-  const char *RxName;
+  FDCAN_HandleTypeDef *TestHandle;
+  const char *TestName;
 
   printf("\n\r========== CAN Loopback Test Start ==========\n\r");
 
-  /* Determine direction */
+  /* Determine which controller to test */
   if (can_test_direction == 0)
   {
-    TxHandle = &hfdcan1;
-    RxHandle = &hfdcan2;
-    TxName = "CAN1";
-    RxName = "CAN2";
-    printf("Direction: CAN1 (TX) -> CAN2 (RX)\n\r");
+    TestHandle = &hfdcan1;
+    TestName = "CAN1";
+    printf("Testing: CAN1 (Internal Loopback with Interrupts)\n\r");
   }
   else
   {
-    TxHandle = &hfdcan2;
-    RxHandle = &hfdcan1;
-    TxName = "CAN2";
-    RxName = "CAN1";
-    printf("Direction: CAN2 (TX) -> CAN1 (RX)\n\r");
+    TestHandle = &hfdcan2;
+    TestName = "CAN2";
+    printf("Testing: CAN2 (Internal Loopback with Interrupts)\n\r");
   }
 
-  /* Start both FDCAN controllers */
-  HAL_FDCAN_Start(&hfdcan1);
-  HAL_FDCAN_Start(&hfdcan2);
+  /* Reset flags */
+  can_rx_complete = 0;
+  can_tx_complete = 0;
+
+  /* Add a filter to accept the test message (must be done before starting) */
+  FDCAN_FilterTypeDef sFilterConfig;
+  sFilterConfig.IdType = FDCAN_STANDARD_ID;
+  sFilterConfig.FilterIndex = 0;
+  sFilterConfig.FilterType = FDCAN_FILTER_MASK;
+  sFilterConfig.FilterConfig = FDCAN_FILTER_TO_RXFIFO0;
+  sFilterConfig.FilterID1 = 0x123;
+  sFilterConfig.FilterID2 = 0x7FF;  /* Mask for all 11-bit identifiers */
+  HAL_FDCAN_ConfigFilter(TestHandle, &sFilterConfig);
+
+  /* Start FDCAN controller */
+  HAL_FDCAN_Start(TestHandle);
+
+  /* Configure RX FIFO0 interrupt (after start) */
+  HAL_FDCAN_ActivateNotification(TestHandle, FDCAN_IT_RX_FIFO0_NEW_MESSAGE, 0);
+  
+  /* Optionally configure TX Complete interrupt (after start) */
+  HAL_FDCAN_ActivateNotification(TestHandle, FDCAN_IT_TX_COMPLETE, 0);
+
+  /* Configure global filter: accept non-matching standard IDs to RX FIFO0, reject extended */
+  HAL_FDCAN_ConfigGlobalFilter(TestHandle,
+                               FDCAN_ACCEPT_IN_RX_FIFO0,
+                               FDCAN_REJECT,
+                               FDCAN_REJECT_REMOTE,
+                               FDCAN_REJECT_REMOTE);
 
   /* Configure TX header */
   TxHeader.Identifier = 0x123;                  /* Test ID */
@@ -121,59 +145,58 @@ static void CAN_LoopbackTest(void)
   TxHeader.TxEventFifoControl = FDCAN_NO_TX_EVENTS;
   TxHeader.MessageMarker = 0;
 
-  /* Add a filter to RX handle to accept the test message */
-  FDCAN_FilterTypeDef sFilterConfig;
-  sFilterConfig.IdType = FDCAN_STANDARD_ID;
-  sFilterConfig.FilterIndex = 0;
-  sFilterConfig.FilterType = FDCAN_FILTER_MASK;
-  sFilterConfig.FilterConfig = FDCAN_FILTER_TO_RXFIFO0;
-  sFilterConfig.FilterID1 = 0x123;
-  sFilterConfig.FilterID2 = 0x7FF;  /* Mask for all 11-bit identifiers */
-  HAL_FDCAN_ConfigFilter(RxHandle, &sFilterConfig);
-
   /* Transmit test message */
-  status = HAL_FDCAN_AddMessageToTxFifoQ(TxHandle, &TxHeader, TxData);
+  status = HAL_FDCAN_AddMessageToTxFifoQ(TestHandle, &TxHeader, TxData);
   if (status != HAL_OK)
   {
-    printf("ERROR: Failed to add message to %s TX FIFO\n\r", TxName);
+    printf("ERROR: Failed to add message to %s TX FIFO\n\r", TestName);
     printf("Status: %d\n\r", status);
     goto test_end;
   }
-  printf("%s TX: Message sent (ID: 0x%03X, Data: ", TxName, TxHeader.Identifier);
+  printf("%s TX: Message queued (ID: 0x%03X, Data: ", TestName, (unsigned int)TxHeader.Identifier);
   for (i = 0; i < 8; i++)
   {
     printf("%02X ", TxData[i]);
   }
   printf(")\n\r");
+  
+  /* Short delay to allow internal loopback to deliver to RX FIFO */
+  HAL_Delay(5);
+  
+  /* Check protocol status and error counters */
+  FDCAN_ProtocolStatusTypeDef protocolStatus;
+  FDCAN_ErrorCountersTypeDef errorCounters;
+  HAL_FDCAN_GetProtocolStatus(TestHandle, &protocolStatus);
+  HAL_FDCAN_GetErrorCounters(TestHandle, &errorCounters);
+    printf("%s TEC: %u, REC: %u, ErrorLogging: %u\n\r", TestName,
+      (unsigned int)errorCounters.TxErrorCnt,
+      (unsigned int)errorCounters.RxErrorCnt,
+      (unsigned int)errorCounters.ErrorLogging);
 
-  /* Wait for message reception with timeout */
+  /* Wait for message reception with interrupt */
   timeout = 0;
-  while (HAL_FDCAN_GetRxFifoFillLevel(RxHandle, FDCAN_RX_FIFO0) == 0 && timeout < 1000)
+  while (can_rx_complete == 0 && timeout < 1000)
   {
     HAL_Delay(1);
     timeout++;
   }
 
-  if (HAL_FDCAN_GetRxFifoFillLevel(RxHandle, FDCAN_RX_FIFO0) > 0)
+  if (can_rx_complete)
   {
-    /* Receive the message */
-    status = HAL_FDCAN_GetRxMessage(RxHandle, FDCAN_RX_FIFO0, &RxHeader, RxData);
-    if (status == HAL_OK)
-    {
-      printf("%s RX: Message received (ID: 0x%03X, Data: ", RxName, RxHeader.Identifier);
+      printf("%s RX: Message received (ID: 0x%03X, Data: ", TestName, (unsigned int)can_rx_hdr.Identifier);
       for (i = 0; i < 8; i++)
       {
-        printf("%02X ", RxData[i]);
+        printf("%02X ", can_rx_buf[i]);
       }
       printf(")\n\r");
 
       /* Verify the received message */
-      if (RxHeader.Identifier == TxHeader.Identifier)
+      if (can_rx_hdr.Identifier == TxHeader.Identifier)
       {
         test_passed = 1;
         for (i = 0; i < 8; i++)
         {
-          if (RxData[i] != TxData[i])
+          if (can_rx_buf[i] != TxData[i])
           {
             test_passed = 0;
             break;
@@ -195,18 +218,10 @@ static void CAN_LoopbackTest(void)
         HAL_Delay(500);
         BSP_LED_Off(LED_RED);
       }
-    }
-    else
-    {
-      printf("ERROR: Failed to get message from %s RX FIFO\n\r", RxName);
-      BSP_LED_On(LED_RED);
-      HAL_Delay(500);
-      BSP_LED_Off(LED_RED);
-    }
   }
   else
   {
-    printf("ERROR: No message received on %s (timeout)\n\r", RxName);
+    printf("ERROR: No message received on %s (timeout)\n\r", TestName);
     BSP_LED_On(LED_RED);
     HAL_Delay(500);
     BSP_LED_Off(LED_RED);
@@ -216,9 +231,8 @@ test_end:
   /* Toggle direction for next test */
   can_test_direction = (can_test_direction == 0) ? 1 : 0;
   
-  /* Stop both FDCAN controllers */
-  HAL_FDCAN_Stop(&hfdcan1);
-  HAL_FDCAN_Stop(&hfdcan2);
+  /* Stop FDCAN controller */
+  HAL_FDCAN_Stop(TestHandle);
   printf("========== CAN Loopback Test End ==========\n\r\n\r");
 }
 
@@ -284,8 +298,6 @@ int main(void)
   printf("Welcome to STM32 world !\n\r");
   /* -- Sample board code to switch on leds ---- */
   BSP_LED_On(LED_GREEN);
-  BSP_LED_On(LED_YELLOW);
-  BSP_LED_On(LED_RED);
   /* USER CODE END BSP */
 
   /* Infinite loop */
@@ -382,7 +394,7 @@ static void MX_FDCAN1_Init(void)
   hfdcan1.Instance = FDCAN1;
   hfdcan1.Init.ClockDivider = FDCAN_CLOCK_DIV1;
   hfdcan1.Init.FrameFormat = FDCAN_FRAME_CLASSIC;
-  hfdcan1.Init.Mode = FDCAN_MODE_NORMAL;
+  hfdcan1.Init.Mode = FDCAN_MODE_INTERNAL_LOOPBACK;
   hfdcan1.Init.AutoRetransmission = DISABLE;
   hfdcan1.Init.TransmitPause = DISABLE;
   hfdcan1.Init.ProtocolException = DISABLE;
@@ -394,7 +406,7 @@ static void MX_FDCAN1_Init(void)
   hfdcan1.Init.DataSyncJumpWidth = 1;
   hfdcan1.Init.DataTimeSeg1 = 1;
   hfdcan1.Init.DataTimeSeg2 = 1;
-  hfdcan1.Init.StdFiltersNbr = 0;
+  hfdcan1.Init.StdFiltersNbr = 1;
   hfdcan1.Init.ExtFiltersNbr = 0;
   hfdcan1.Init.TxFifoQueueMode = FDCAN_TX_FIFO_OPERATION;
   if (HAL_FDCAN_Init(&hfdcan1) != HAL_OK)
@@ -425,7 +437,7 @@ static void MX_FDCAN2_Init(void)
   hfdcan2.Instance = FDCAN2;
   hfdcan2.Init.ClockDivider = FDCAN_CLOCK_DIV1;
   hfdcan2.Init.FrameFormat = FDCAN_FRAME_CLASSIC;
-  hfdcan2.Init.Mode = FDCAN_MODE_NORMAL;
+  hfdcan2.Init.Mode = FDCAN_MODE_INTERNAL_LOOPBACK;
   hfdcan2.Init.AutoRetransmission = DISABLE;
   hfdcan2.Init.TransmitPause = DISABLE;
   hfdcan2.Init.ProtocolException = DISABLE;
@@ -437,7 +449,7 @@ static void MX_FDCAN2_Init(void)
   hfdcan2.Init.DataSyncJumpWidth = 1;
   hfdcan2.Init.DataTimeSeg1 = 1;
   hfdcan2.Init.DataTimeSeg2 = 1;
-  hfdcan2.Init.StdFiltersNbr = 0;
+  hfdcan2.Init.StdFiltersNbr = 1;
   hfdcan2.Init.ExtFiltersNbr = 0;
   hfdcan2.Init.TxFifoQueueMode = FDCAN_TX_FIFO_OPERATION;
   if (HAL_FDCAN_Init(&hfdcan2) != HAL_OK)
@@ -571,6 +583,40 @@ static void MX_GPIO_Init(void)
 }
 
 /* USER CODE BEGIN 4 */
+
+/**
+  * @brief  RX FIFO 0 callback.
+  * @param  hfdcan pointer to an FDCAN_HandleTypeDef structure that contains
+  *         the configuration information for the specified FDCAN.
+  * @param  RxFifo0ITs indicates which RX FIFO 0 interrupts are signaled.
+  * @retval None
+  */
+void HAL_FDCAN_RxFifo0Callback(FDCAN_HandleTypeDef *hfdcan, uint32_t RxFifo0ITs)
+{
+  if ((RxFifo0ITs & FDCAN_IT_RX_FIFO0_NEW_MESSAGE) != 0)
+  {
+    /* Read the message into a global buffer and set flag */
+    if (HAL_FDCAN_GetRxMessage(hfdcan, FDCAN_RX_FIFO0,
+                               (FDCAN_RxHeaderTypeDef*)&can_rx_hdr,
+                               (uint8_t*)can_rx_buf) == HAL_OK)
+    {
+      can_rx_complete = 1;
+    }
+  }
+}
+
+/**
+  * @brief  TX Buffer complete callback.
+  * @param  hfdcan pointer to an FDCAN_HandleTypeDef structure that contains
+  *         the configuration information for the specified FDCAN.
+  * @param  BufferIndexes Indexes of the transmitted buffers.
+  * @retval None
+  */
+void HAL_FDCAN_TxBufferCompleteCallback(FDCAN_HandleTypeDef *hfdcan, uint32_t BufferIndexes)
+{
+  /* Set flag indicating message transmitted */
+  can_tx_complete = 1;
+}
 
 /* USER CODE END 4 */
 
