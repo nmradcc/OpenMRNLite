@@ -18,6 +18,7 @@
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
+#include "stm32h5xx_nucleo.h"
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
@@ -69,10 +70,10 @@ static void MX_ICACHE_Init(void);
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
 
-static uint8_t can_test_direction = 0;  /* 0 = CAN1, 1 = CAN2 */
+static uint8_t can_test_number = 0;  /* 0 = CAN1 Loopback, 1 = CAN2 Loopback, 2 = Direct Transceiver Loopback (bidirectional) */
 
 /**
-  * @brief  Perform a simple CAN loopback test using interrupts
+  * @brief  Perform CAN tests with different modes
   * @param  None
   * @retval None
   */
@@ -86,29 +87,84 @@ static void CAN_LoopbackTest(void)
   uint8_t test_passed = 0;
   uint8_t i;
   FDCAN_HandleTypeDef *TestHandle;
+  FDCAN_HandleTypeDef *OtherHandle;
   const char *TestName;
+  const char *OtherName;
+  const char *TestDesc;
 
-  printf("\n\r========== CAN Loopback Test Start ==========\n\r");
+  printf("\n\r========== CAN Test %d Start ==========\n\r", can_test_number + 1);
 
-  /* Determine which controller to test */
-  if (can_test_direction == 0)
+  /* Determine which test to run */
+  switch (can_test_number)
   {
-    TestHandle = &hfdcan1;
-    TestName = "CAN1";
-    printf("Testing: CAN1 (Internal Loopback with Interrupts)\n\r");
+    case 0:
+      /* Test 1: CAN1 Internal Loopback */
+      TestHandle = &hfdcan1;
+      OtherHandle = NULL;
+      TestName = "CAN1";
+      OtherName = NULL;
+      TestDesc = "Internal Loopback with Interrupts";
+      printf("Testing: CAN1 (Internal Loopback with Interrupts)\n\r");
+      break;
+    case 1:
+      /* Test 2: CAN2 Internal Loopback */
+      TestHandle = &hfdcan2;
+      OtherHandle = NULL;
+      TestName = "CAN2";
+      OtherName = NULL;
+      TestDesc = "Internal Loopback with Interrupts";
+      printf("Testing: CAN2 (Internal Loopback with Interrupts)\n\r");
+      break;
+    case 2:
+      /* Test 3: Direct Transceiver Loopback via External Connection - Bidirectional */
+      TestHandle = &hfdcan1;
+      OtherHandle = &hfdcan2;
+      TestName = "CAN1";
+      OtherName = "CAN2";
+      TestDesc = "Direct Transceiver Loopback (Bidirectional)";
+      printf("Testing: Bidirectional Direct Transceiver Loopback\n\r");
+      printf("Note: Requires CAN1 and CAN2 connected on external CAN bus\n\r");
+      break;
+    default:
+      can_test_number = 0;
+      return;
   }
-  else
+
+  /* Stop any existing operation */
+  HAL_FDCAN_Stop(TestHandle);
+  if (OtherHandle != NULL)
   {
-    TestHandle = &hfdcan2;
-    TestName = "CAN2";
-    printf("Testing: CAN2 (Internal Loopback with Interrupts)\n\r");
+    HAL_FDCAN_Stop(OtherHandle);
   }
+  HAL_Delay(10);
 
   /* Reset flags */
   can_rx_complete = 0;
   can_tx_complete = 0;
 
-  /* Add a filter to accept the test message (must be done before starting) */
+  /* Configure the test based on test number */
+  if (can_test_number == 2)
+  {
+    /* Test 3: Reconfigure to Normal Mode for direct transceiver loopback */
+    printf("[DEBUG] Reconfiguring to Normal Mode...\n\r");
+    TestHandle->Init.Mode = FDCAN_MODE_NORMAL;
+    TestHandle->Init.StdFiltersNbr = 2;  /* Need 2 filters for bidirectional test */
+    OtherHandle->Init.Mode = FDCAN_MODE_NORMAL;
+    OtherHandle->Init.StdFiltersNbr = 2;  /* Need 2 filters for bidirectional test */
+    if (HAL_FDCAN_Init(TestHandle) != HAL_OK)
+    {
+      printf("ERROR: Failed to reconfigure %s to Normal Mode\n\r", TestName);
+      goto test_end;
+    }
+    if (HAL_FDCAN_Init(OtherHandle) != HAL_OK)
+    {
+      printf("ERROR: Failed to reconfigure %s to Normal Mode\n\r", OtherName);
+      goto test_end;
+    }
+    printf("Reconfigured %s and %s to Normal Mode\n\r", TestName, OtherName);
+  }
+
+  /* Add a filter to accept the test message (must be done AFTER Init) */
   FDCAN_FilterTypeDef sFilterConfig;
   sFilterConfig.IdType = FDCAN_STANDARD_ID;
   sFilterConfig.FilterIndex = 0;
@@ -116,16 +172,75 @@ static void CAN_LoopbackTest(void)
   sFilterConfig.FilterConfig = FDCAN_FILTER_TO_RXFIFO0;
   sFilterConfig.FilterID1 = 0x123;
   sFilterConfig.FilterID2 = 0x7FF;  /* Mask for all 11-bit identifiers */
-  HAL_FDCAN_ConfigFilter(TestHandle, &sFilterConfig);
+  
+  if (HAL_FDCAN_ConfigFilter(TestHandle, &sFilterConfig) != HAL_OK)
+  {
+    printf("ERROR: Failed to configure filter on %s\n\r", TestName);
+  }
+  
+  /* For test 3, add filter for reverse direction ID on CAN1 */
+  if (can_test_number == 2)
+  {
+    FDCAN_FilterTypeDef sFilterConfig1 = sFilterConfig;
+    sFilterConfig1.FilterID1 = 0x234;  /* Accept reverse direction ID */
+    sFilterConfig1.FilterIndex = 1;  /* Use second filter slot */
+    if (HAL_FDCAN_ConfigFilter(TestHandle, &sFilterConfig1) != HAL_OK)
+    {
+      printf("ERROR: Failed to configure second filter on %s\n\r", TestName);
+    }
+    printf("[DEBUG] %s filters configured for IDs 0x%03X and 0x%03X\n\r", 
+           TestName, (unsigned int)sFilterConfig.FilterID1, (unsigned int)sFilterConfig1.FilterID1);
+  }
+  else
+  {
+    printf("[DEBUG] %s filter configured for ID 0x%03X\n\r", TestName, (unsigned int)sFilterConfig.FilterID1);
+  }
+  
+  if (OtherHandle != NULL)
+  {
+    /* For test 3, also configure filter for reverse direction ID */
+    FDCAN_FilterTypeDef sFilterConfig2 = sFilterConfig;
+    sFilterConfig2.FilterID1 = 0x234;  /* Accept reverse direction ID */
+    sFilterConfig2.FilterIndex = 1;  /* Use second filter slot */
+    if (HAL_FDCAN_ConfigFilter(OtherHandle, &sFilterConfig) != HAL_OK)
+    {
+      printf("ERROR: Failed to configure filter on %s\n\r", OtherName);
+    }
+    if (HAL_FDCAN_ConfigFilter(OtherHandle, &sFilterConfig2) != HAL_OK)
+    {
+      printf("ERROR: Failed to configure second filter on %s\n\r", OtherName);
+    }
+    printf("[DEBUG] %s filters configured for IDs 0x%03X and 0x%03X\n\r", 
+           OtherName, (unsigned int)sFilterConfig.FilterID1, (unsigned int)sFilterConfig2.FilterID1);
+  }
 
-  /* Start FDCAN controller */
-  HAL_FDCAN_Start(TestHandle);
+  /* Start FDCAN controllers */
+  if (HAL_FDCAN_Start(TestHandle) != HAL_OK)
+  {
+    printf("ERROR: Failed to start %s\n\r", TestName);
+    goto test_end;
+  }
+  printf("[DEBUG] %s started successfully\n\r", TestName);
+  
+  if (OtherHandle != NULL)
+  {
+    if (HAL_FDCAN_Start(OtherHandle) != HAL_OK)
+    {
+      printf("ERROR: Failed to start %s\n\r", OtherName);
+      goto test_end;
+    }
+    printf("[DEBUG] %s started successfully\n\r", OtherName);
+  }
 
   /* Configure RX FIFO0 interrupt (after start) */
   HAL_FDCAN_ActivateNotification(TestHandle, FDCAN_IT_RX_FIFO0_NEW_MESSAGE, 0);
-  
-  /* Optionally configure TX Complete interrupt (after start) */
   HAL_FDCAN_ActivateNotification(TestHandle, FDCAN_IT_TX_COMPLETE, 0);
+  
+  if (OtherHandle != NULL)
+  {
+    HAL_FDCAN_ActivateNotification(OtherHandle, FDCAN_IT_RX_FIFO0_NEW_MESSAGE, 0);
+    HAL_FDCAN_ActivateNotification(OtherHandle, FDCAN_IT_TX_COMPLETE, 0);
+  }
 
   /* Configure global filter: accept non-matching standard IDs to RX FIFO0, reject extended */
   HAL_FDCAN_ConfigGlobalFilter(TestHandle,
@@ -133,6 +248,15 @@ static void CAN_LoopbackTest(void)
                                FDCAN_REJECT,
                                FDCAN_REJECT_REMOTE,
                                FDCAN_REJECT_REMOTE);
+  
+  if (OtherHandle != NULL)
+  {
+    HAL_FDCAN_ConfigGlobalFilter(OtherHandle,
+                                 FDCAN_ACCEPT_IN_RX_FIFO0,
+                                 FDCAN_REJECT,
+                                 FDCAN_REJECT_REMOTE,
+                                 FDCAN_REJECT_REMOTE);
+  }
 
   /* Configure TX header */
   TxHeader.Identifier = 0x123;                  /* Test ID */
@@ -145,7 +269,7 @@ static void CAN_LoopbackTest(void)
   TxHeader.TxEventFifoControl = FDCAN_NO_TX_EVENTS;
   TxHeader.MessageMarker = 0;
 
-  /* Transmit test message */
+  /* Transmit test message from primary controller */
   status = HAL_FDCAN_AddMessageToTxFifoQ(TestHandle, &TxHeader, TxData);
   if (status != HAL_OK)
   {
@@ -160,30 +284,65 @@ static void CAN_LoopbackTest(void)
   }
   printf(")\n\r");
   
-  /* Short delay to allow internal loopback to deliver to RX FIFO */
-  HAL_Delay(5);
+  /* For tests 1 & 2, wait shorter; for test 3 (external), wait longer */
+  uint32_t wait_time = (can_test_number == 2) ? 100 : 5;
+  HAL_Delay(wait_time);
+  
+  /* Check RX FIFO levels */
+  if (can_test_number == 2)
+  {
+    uint32_t fifo_level = HAL_FDCAN_GetRxFifoFillLevel(OtherHandle, FDCAN_RX_FIFO0);
+    printf("[DEBUG] %s RX FIFO0 level: %u\n\r", OtherName, (unsigned int)fifo_level);
+  }
   
   /* Check protocol status and error counters */
   FDCAN_ProtocolStatusTypeDef protocolStatus;
   FDCAN_ErrorCountersTypeDef errorCounters;
   HAL_FDCAN_GetProtocolStatus(TestHandle, &protocolStatus);
   HAL_FDCAN_GetErrorCounters(TestHandle, &errorCounters);
-    printf("%s TEC: %u, REC: %u, ErrorLogging: %u\n\r", TestName,
+  printf("%s TEC: %u, REC: %u, ErrorLogging: %u\n\r", TestName,
+    (unsigned int)errorCounters.TxErrorCnt,
+    (unsigned int)errorCounters.RxErrorCnt,
+    (unsigned int)errorCounters.ErrorLogging);
+  printf("[DEBUG] %s LastErrorCode: 0x%02X, BusOff: %u, ErrorPassive: %u\n\r", TestName,
+    (unsigned int)protocolStatus.LastErrorCode,
+    (unsigned int)protocolStatus.BusOff,
+    (unsigned int)protocolStatus.ErrorPassive);
+  
+  if (OtherHandle != NULL)
+  {
+    HAL_FDCAN_GetProtocolStatus(OtherHandle, &protocolStatus);
+    HAL_FDCAN_GetErrorCounters(OtherHandle, &errorCounters);
+    printf("%s TEC: %u, REC: %u, ErrorLogging: %u\n\r", OtherName,
       (unsigned int)errorCounters.TxErrorCnt,
       (unsigned int)errorCounters.RxErrorCnt,
       (unsigned int)errorCounters.ErrorLogging);
+    printf("[DEBUG] %s LastErrorCode: 0x%02X, BusOff: %u, ErrorPassive: %u\n\r", OtherName,
+      (unsigned int)protocolStatus.LastErrorCode,
+      (unsigned int)protocolStatus.BusOff,
+      (unsigned int)protocolStatus.ErrorPassive);
+  }
 
   /* Wait for message reception with interrupt */
   timeout = 0;
-  while (can_rx_complete == 0 && timeout < 1000)
+  uint32_t max_timeout = (can_test_number == 2) ? 2000 : 1000;  /* Longer timeout for external tests */
+  printf("[DEBUG] Waiting for RX (max %ums)...\n\r", (unsigned int)max_timeout);
+  while (can_rx_complete == 0 && timeout < max_timeout)
   {
     HAL_Delay(1);
     timeout++;
+    /* Check for TX complete */
+    if (can_test_number == 2 && timeout == 50 && can_tx_complete)
+    {
+      printf("[DEBUG] TX complete confirmed\n\r");
+    }
   }
 
   if (can_rx_complete)
   {
-      printf("%s RX: Message received (ID: 0x%03X, Data: ", TestName, (unsigned int)can_rx_hdr.Identifier);
+      printf("%s RX: Message received (ID: 0x%03X, Data: ", 
+             (OtherHandle != NULL && can_test_number == 2) ? OtherName : TestName,
+             (unsigned int)can_rx_hdr.Identifier);
       for (i = 0; i < 8; i++)
       {
         printf("%02X ", can_rx_buf[i]);
@@ -204,36 +363,177 @@ static void CAN_LoopbackTest(void)
         }
       }
 
-      if (test_passed)
+      if (!test_passed)
       {
-        printf("\n\r*** CAN LOOPBACK TEST PASSED ***\n\r");
-        BSP_LED_On(LED_GREEN);
-        HAL_Delay(500);
-        BSP_LED_Off(LED_GREEN);
-      }
-      else
-      {
-        printf("\n\r*** CAN LOOPBACK TEST FAILED: Data Mismatch ***\n\r");
+        printf("\n\r*** CAN TEST %d FAILED: Data Mismatch ***\n\r", can_test_number + 1);
         BSP_LED_On(LED_RED);
-        HAL_Delay(500);
-        BSP_LED_Off(LED_RED);
+        goto test_end;
       }
   }
   else
   {
-    printf("ERROR: No message received on %s (timeout)\n\r", TestName);
+    printf("ERROR: No message received (timeout after %ums)\n\r", (unsigned int)timeout);
+    if (can_test_number == 2)
+    {
+      printf("[DEBUG] TX complete flag: %u\n\r", can_tx_complete);
+      printf("[DEBUG] RX complete flag: %u\n\r", can_rx_complete);
+      
+      /* Check FIFO levels */
+      uint32_t fifo_level_can1 = HAL_FDCAN_GetRxFifoFillLevel(TestHandle, FDCAN_RX_FIFO0);
+      uint32_t fifo_level_can2 = HAL_FDCAN_GetRxFifoFillLevel(OtherHandle, FDCAN_RX_FIFO0);
+      printf("[DEBUG] %s RX FIFO0 level: %u, %s RX FIFO0 level: %u\n\r", 
+             TestName, (unsigned int)fifo_level_can1, OtherName, (unsigned int)fifo_level_can2);
+      
+      /* Re-check error counters */
+      HAL_FDCAN_GetErrorCounters(TestHandle, &errorCounters);
+      HAL_FDCAN_GetProtocolStatus(TestHandle, &protocolStatus);
+      printf("[DEBUG] %s Final TEC: %u, REC: %u, LastError: 0x%02X\n\r", TestName,
+        (unsigned int)errorCounters.TxErrorCnt,
+        (unsigned int)errorCounters.RxErrorCnt,
+        (unsigned int)protocolStatus.LastErrorCode);
+      if (OtherHandle != NULL)
+      {
+        HAL_FDCAN_GetErrorCounters(OtherHandle, &errorCounters);
+        HAL_FDCAN_GetProtocolStatus(OtherHandle, &protocolStatus);
+        printf("[DEBUG] %s Final TEC: %u, REC: %u, LastError: 0x%02X\n\r", OtherName,
+          (unsigned int)errorCounters.TxErrorCnt,
+          (unsigned int)errorCounters.RxErrorCnt,
+          (unsigned int)protocolStatus.LastErrorCode);
+      }
+      printf("Hint for Test 3:\n\r");
+      printf("  1. Verify CAN1 and CAN2 are physically connected via transceivers\n\r");
+      printf("  2. Check CAN bus termination (120 ohm resistors at both ends)\n\r");
+      printf("  3. Verify transceiver power and connections (CANH, CANL, GND)\n\r");
+      printf("  4. TEC increasing = No ACK (no device on bus or bus error)\n\r");
+      printf("  5. If no hardware: Test 3 requires external CAN transceivers\n\r");
+    }
     BSP_LED_On(LED_RED);
+    goto test_end;
+  }
+
+  /* For Test 3, perform bidirectional test (reverse direction) */
+  if (can_test_number == 2)
+  {
+    printf("\n\r--- Bidirectional Test: Reverse Direction ---\n\r");
+    
+    /* Reset flags for second direction */
+    can_rx_complete = 0;
+    can_tx_complete = 0;
+    
+    /* Prepare different data for reverse test */
+    uint8_t TxData2[8] = {0x08, 0x07, 0x06, 0x05, 0x04, 0x03, 0x02, 0x01};
+    TxHeader.Identifier = 0x234;  /* Different ID for reverse direction */
+
+    /* Transmit from OtherHandle (CAN2) */
+    status = HAL_FDCAN_AddMessageToTxFifoQ(OtherHandle, &TxHeader, TxData2);
+    if (status != HAL_OK)
+    {
+      printf("ERROR: Failed to add message to %s TX FIFO\n\r", OtherName);
+      printf("Status: %d\n\r", status);
+      goto test_end;
+    }
+    printf("%s TX: Message queued (ID: 0x%03X, Data: ", OtherName, (unsigned int)TxHeader.Identifier);
+    for (i = 0; i < 8; i++)
+    {
+      printf("%02X ", TxData2[i]);
+    }
+    printf(")\n\r");
+    
+    HAL_Delay(100);
+    
+    /* Wait for message reception on TestHandle (CAN1) */
+    timeout = 0;
+    printf("[DEBUG] Waiting for reverse direction RX...\n\r");
+    while (can_rx_complete == 0 && timeout < 2000)
+    {
+      HAL_Delay(1);
+      timeout++;
+      /* Check for TX complete in reverse direction */
+      if (timeout == 50 && can_tx_complete)
+      {
+        printf("[DEBUG] Reverse TX complete confirmed\n\r");
+      }
+    }
+
+    if (can_rx_complete)
+    {
+        printf("%s RX: Message received (ID: 0x%03X, Data: ", TestName, (unsigned int)can_rx_hdr.Identifier);
+        for (i = 0; i < 8; i++)
+        {
+          printf("%02X ", can_rx_buf[i]);
+        }
+        printf(")\n\r");
+
+        /* Verify the received message */
+        if (can_rx_hdr.Identifier == TxHeader.Identifier)
+        {
+          test_passed = 1;
+          for (i = 0; i < 8; i++)
+          {
+            if (can_rx_buf[i] != TxData2[i])
+            {
+              test_passed = 0;
+              break;
+            }
+          }
+        }
+
+        if (test_passed)
+        {
+          printf("\n\r*** CAN TEST %d PASSED (Bidirectional) ***\n\r", can_test_number + 1);
+          BSP_LED_On(LED_YELLOW);
+          HAL_Delay(500);
+          BSP_LED_Off(LED_YELLOW);
+        }
+        else
+        {
+          printf("\n\r*** CAN TEST %d FAILED: Reverse Direction Data Mismatch ***\n\r", can_test_number + 1);
+          BSP_LED_On(LED_RED);
+        }
+    }
+    else
+    {
+      printf("ERROR: No message received on %s in reverse direction (timeout after %ums)\n\r", TestName, (unsigned int)timeout);
+      printf("[DEBUG] Reverse TX complete flag: %u\n\r", can_tx_complete);
+      /* Check error counters for reverse direction failure */
+      HAL_FDCAN_GetErrorCounters(OtherHandle, &errorCounters);
+      HAL_FDCAN_GetProtocolStatus(OtherHandle, &protocolStatus);
+      printf("[DEBUG] %s Reverse TEC: %u, REC: %u, LastError: 0x%02X\n\r", OtherName,
+        (unsigned int)errorCounters.TxErrorCnt,
+        (unsigned int)errorCounters.RxErrorCnt,
+        (unsigned int)protocolStatus.LastErrorCode);
+      BSP_LED_On(LED_RED);
+    }
+  }
+  else
+  {
+    /* For tests 1 and 2, single direction is enough */
+    printf("\n\r*** CAN TEST %d PASSED (%s) ***\n\r", can_test_number + 1, TestDesc);
+    BSP_LED_On(LED_YELLOW);
     HAL_Delay(500);
-    BSP_LED_Off(LED_RED);
+    BSP_LED_Off(LED_YELLOW);
   }
 
 test_end:
-  /* Toggle direction for next test */
-  can_test_direction = (can_test_direction == 0) ? 1 : 0;
+  /* Move to next test */
+  can_test_number = (can_test_number + 1) % 3;
   
-  /* Stop FDCAN controller */
+  /* Stop FDCAN controllers */
   HAL_FDCAN_Stop(TestHandle);
-  printf("========== CAN Loopback Test End ==========\n\r\n\r");
+  if (OtherHandle != NULL)
+  {
+    HAL_FDCAN_Stop(OtherHandle);
+  }
+  
+  /* Re-initialize to loopback mode if we're moving back to tests 1 or 2 */
+  if (can_test_number == 0 || can_test_number == 1)
+  {
+    FDCAN_HandleTypeDef *handle = (can_test_number == 0) ? &hfdcan1 : &hfdcan2;
+    handle->Init.Mode = FDCAN_MODE_INTERNAL_LOOPBACK;
+    HAL_FDCAN_Init(handle);
+  }
+  
+  printf("========== CAN Test %d End ==========\n\r\n\r", (can_test_number == 0) ? 3 : can_test_number);
 }
 
 /* USER CODE END 0 */
@@ -296,6 +596,10 @@ int main(void)
   /* USER CODE BEGIN BSP */
   /* -- Sample board code to send message over COM1 port ---- */
   printf("Welcome to STM32 world !\n\r");
+  printf("CAN Bus Tests - Press user button to cycle through tests:\n\r");
+  printf("  Test 1: CAN1 Internal Loopback\n\r");
+  printf("  Test 2: CAN2 Internal Loopback\n\r");
+  printf("  Test 3: Direct Transceiver Loopback (Bidirectional)\n\r");
   /* -- Sample board code to switch on leds ---- */
   BSP_LED_On(LED_GREEN);
   /* USER CODE END BSP */
