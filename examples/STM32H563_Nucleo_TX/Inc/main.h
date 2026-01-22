@@ -56,6 +56,7 @@ extern FDCAN_HandleTypeDef hfdcan2;
 /* Exported functions prototypes ---------------------------------------------*/
 void Error_Handler(void);
 void MX_FDCAN1_Init(void);
+void MX_FDCAN2_Init(void);
 
 /* USER CODE BEGIN EFP */
 

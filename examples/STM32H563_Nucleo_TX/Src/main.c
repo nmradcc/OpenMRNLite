@@ -55,7 +55,6 @@ FDCAN_HandleTypeDef hfdcan2;
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_ICACHE_Init(void);
-static void MX_FDCAN2_Init(void);
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
@@ -236,7 +235,7 @@ void MX_FDCAN1_Init(void)
   * @param None
   * @retval None
   */
-static void MX_FDCAN2_Init(void)
+void MX_FDCAN2_Init(void)
 {
 
   /* USER CODE BEGIN FDCAN2_Init 0 */
@@ -316,6 +315,7 @@ static void MX_GPIO_Init(void)
   /* GPIO Ports Clock Enable */
   __HAL_RCC_GPIOH_CLK_ENABLE();
   __HAL_RCC_GPIOB_CLK_ENABLE();
+  __HAL_RCC_GPIOA_CLK_ENABLE();
   __HAL_RCC_GPIOD_CLK_ENABLE();
 
   /* USER CODE BEGIN MX_GPIO_Init_2 */
