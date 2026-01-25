@@ -81,13 +81,8 @@ extern os_mutex_t g_log_mutex;
 #define GLOBAL_LOG_OUTPUT log_output
 #endif
 
-#ifdef __FreeRTOS__
-#define LOG_MAYBE_DIE(level) (level == FATAL)
-#else
-/// Splits the death behavior of FreeRTOS (where we just blink) from everything
-/// else (where we actually print a death message).
+/// ThreadX implementation: do not die on FATAL log level
 #define LOG_MAYBE_DIE(level) 0
-#endif
 
 /// Conditionally write a message to the logging output.
 /// @param level is the log level; if the configured loglevel is smaller, then
@@ -127,12 +122,8 @@ extern os_mutex_t g_log_mutex;
 extern char logbuffer[256];
 
 #ifndef LOGLEVEL
-#ifdef __FreeRTOS__
-#define LOGLEVEL FATAL
-#else
 /// Default loglevel.
 #define LOGLEVEL INFO
-#endif // not FreeRTOS
 #endif // ifndef LOGLEVEL
 
 #ifdef __cplusplus

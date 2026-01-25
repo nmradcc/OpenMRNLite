@@ -1,159 +1,165 @@
-# Migration Guide for Optional Modules
+# Migration Guide: ThreadX-Only Version
 
-## Overview
+This document describes the changes made to create the ThreadX-exclusive version of OpenMRNLite and how to migrate existing code.
 
-Starting with this version, OpenMRNLite makes the BLE and DCC modules optional and **disabled by default**. This is a **breaking change** - existing projects that use BLE or DCC features will need to explicitly enable these modules.
+## Major Changes
 
-## What Changed
+### 1. Removed Multi-RTOS Support
 
-### Before
-All modules (BLE and DCC) were always compiled into the library.
+**Before:**
+- Supported FreeRTOS, ThreadX, and CMSIS-RTOS v2
+- RTOS selection via CMake options
+- Abstraction layer in `src/os/` with multiple implementations
 
-### After
-- BLE and DCC modules are **optional** and controlled by CMake options
-- By default, both modules are **enabled** (backward compatible)
-- New CMake options: `OPENMRN_ENABLE_BLE` and `OPENMRN_ENABLE_DCC`
-- New feature flags: `OPENMRN_FEATURE_BLE` and `OPENMRN_FEATURE_DCC`
+**After:**
+- ThreadX only
+- No RTOS selection - ThreadX is always used
+- Simplified OS layer with only `threadx_impl.c` and `threadx_impl.h`
 
-## Impact on Existing Projects
+### 2. Removed FreeRTOS Drivers
 
-### Action Required (Breaking Change)
-If your project uses BLE or DCC features, you **must** enable them explicitly:
-- Both BLE and DCC modules are now **disabled by default**
-- Projects using these features will fail to compile without enabling them
-- Modifications to your CMakeLists.txt are required if you use these modules
+**Before:**
+- Arduino-compatible API
+- FreeRTOS-specific drivers in `src/freertos_drivers/`
+- `CanBridge` and `SerialBridge` classes for Arduino
 
-### Enabling Required Modules
-If your project uses BLE or DCC features:
+**After:**
+- STM32 HAL + ThreadX native API
+- `FdCanBridge` for direct STM32 FDCAN integration
+- No Arduino dependencies
 
-1. **Identify which modules you use:**
-   - Do you use any BLE features? (files in `src/ble/`)
-   - Do you use any DCC features? (files in `src/dcc/`, traction features)
+### 3. Simplified OpenMRN API
 
-2. **Update your CMake configuration:**
-   ```cmake
-   # In your project's CMakeLists.txt, before including OpenMRNLite:
-   set(OPENMRN_ENABLE_BLE ON)  # If you use BLE
-   set(OPENMRN_ENABLE_DCC ON)  # If you use DCC
-   ```
+**Before:**
+```cpp
+OpenMRN openmrn(NODE_ID);
+openmrn.begin();
+openmrn.add_can_port(&canPort);  // Arduino-style CAN
+openmrn.start_executor_thread();  // Default parameters
+```
 
-   Or via command line:
-   ```bash
-   cmake -DOPENMRN_ENABLE_BLE=ON -DOPENMRN_ENABLE_DCC=ON ..
-   ```
+**After:**
+```cpp
+OpenMRN openmrn(NODE_ID);
+setup_can_bridge(&openmrn, &hfdcan1, Error_Handler);  // STM32 HAL
+openmrn.begin();
+openmrn.start_executor_thread("OpenMRN", 16, 2048);  // ThreadX params
+```
 
-3. **Add feature guards in your code (optional):**
-   If you have conditional code that depends on these modules:
+### 4. CMakeLists.txt Changes
+
+**Before:**
+```cmake
+set(OPENMRN_RTOS "ThreadX" CACHE STRING "Select RTOS")
+```
+
+**After:**
+```cmake
+# ThreadX is the only supported RTOS
+# No RTOS selection option
+```
+
+### 5. Header File Changes
+
+**rtos_includes.h - Before:**
+```cpp
+#if defined(OPENMRN_FEATURE_RTOS_FREERTOS)
+    #include "FreeRTOS.h"
+    // ...
+#elif defined(OPENMRN_FEATURE_RTOS_THREADX)
+    #include "tx_api.h"
+    // ...
+#elif defined(OPENMRN_FEATURE_RTOS_CMSIS_V2)
+    // ...
+#endif
+```
+
+**rtos_includes.h - After:**
+```cpp
+#define USING_THREADX 1
+#include "tx_api.h"
+```
+
+## Migration Steps
+
+### For Existing ThreadX Users
+
+1. **Update CMakeLists.txt**
+   - Remove `OPENMRN_RTOS` variable references
+   - Library automatically configures for ThreadX
+
+2. **Replace CAN Bridge**
    ```cpp
-   #include "openmrn_features.h"
+   // Old (if using custom bridge)
+   openmrn.add_can_port(&myCanPort);
    
-   #if OPENMRN_FEATURE_DCC
-       // DCC-dependent code
-   #endif
+   // New
+   #include "FdCanBridge.h"
+   setup_can_bridge(&openmrn, &hfdcan1, Error_Handler);
    ```
 
-## Code That May Be Affected
-
-### If You Disable DCC Module
-
-The following OpenLCB components have DCC dependencies and may require modifications:
-
-- `openlcb/TractionCvSpace.hxx` - CV programming support
-- `openlcb/TractionProxy.cpp` - Proxy for DCC locomotives
-- `openlcb/TrainInterface.hxx` - Train control interface
-- `openlcb/TractionDefs.hxx` - Traction definitions
-- `openlcb/DccAccyConsumer.hxx` - DCC accessory decoder consumer
-
-**Solution:** Either keep DCC enabled, or avoid using these specific OpenLCB traction features.
-
-### If You Disable BLE Module
-
-The BLE module is self-contained and has no dependencies in other parts of the library.
-
-**Solution:** Simply don't include BLE headers in your application code.
-
-## Testing Your Migration
-
-1. **With modules disabled (default):**
-   ```bash
-   cmake ..
-   cmake --build .
-   # Check for compilation errors
-   # If errors occur, you need to enable required modules
+3. **Update Thread Creation**
+   ```cpp
+   // Old
+   openmrn.start_executor_thread();
+   
+   // New (specify ThreadX parameters)
+   openmrn.start_executor_thread("OpenMRN", 16, 2048);
    ```
 
-2. **With modules enabled:**
-   ```bash
-   cmake -DOPENMRN_ENABLE_BLE=ON -DOPENMRN_ENABLE_DCC=ON ..
-   cmake --build .
-   # Verify your application works with the modules you need
-   ```
+### For FreeRTOS/CMSIS Users
 
-## Examples
+**This version does not support FreeRTOS or CMSIS-RTOS.** If you need those RTOSes, use the original multi-RTOS version of OpenMRNLite.
 
-### Example 1: DCC-Only Project
-```cmake
-# CMakeLists.txt
-# BLE is OFF by default, no need to set it
-set(OPENMRN_ENABLE_DCC ON)   # Need DCC for track control
+## API Reference Changes
 
-add_subdirectory(OpenMRNLite)
-target_link_libraries(my_project OpenMRNLite)
+### OpenMRN Class
+
+| Method | Before | After |
+|--------|--------|-------|
+| Constructor | `OpenMRN()` or `OpenMRN(node_id)` | `OpenMRN(node_id)` only |
+| Start executor | `start_executor_thread()` | `start_executor_thread(name, priority, stack)` |
+| Add CAN port | `add_can_port(Can*)` | Use `setup_can_bridge()` from FdCanBridge.h |
+| Add serial | `add_gridconnect_port(&Serial)` | Not supported (STM32 HAL only) |
+
+### Removed Classes
+
+- `SerialBridge<T>` - Arduino serial support removed
+- `CanBridge` - Replaced by `FdCanBridge`
+- All Arduino GPIO wrappers
+
+### New Components
+
+- `FdCanBridge` - STM32 HAL FDCAN bridge
+  - `setup_can_bridge(openmrn, hfdcan, error_handler)`
+  - Handles RX/TX via HAL interrupts
+  - Automatic registration with CAN hub
+
+## Example Project Structure
+
+```
+MyProject/
+├── CMakeLists.txt           # Links OpenMRNLite library
+├── main.c                   # STM32 HAL initialization
+├── app_threadx.c            # ThreadX initialization
+└── openmrn_node.cpp         # OpenMRN stack setup
+    ├── #include <OpenMRNLite.h>
+    ├── #include "FdCanBridge.h"
+    └── setup_can_bridge(&openmrn, &hfdcan1, Error_Handler)
 ```
 
-### Example 2: Minimal OpenLCB Project
-```cmake
-# CMakeLists.txt
-# Both modules are OFF by default - no configuration needed
+## Benefits of ThreadX-Only Version
 
-add_subdirectory(OpenMRNLite)
-target_link_libraries(my_project OpenMRNLite)
-```
+1. **Smaller Code Size** - No multi-RTOS abstraction overhead
+2. **Simpler Debugging** - Direct ThreadX API calls, no indirection
+3. **Better Integration** - Native ThreadX primitives throughout
+4. **Clearer Code** - No `#ifdef` blocks for RTOS selection
+5. **Easier Maintenance** - Single RTOS target
 
-### Example 3: Full-Featured Project with Both Modules
-```cmake
-# CMakeLists.txt
-set(OPENMRN_ENABLE_BLE ON)   # Need BLE support
-set(OPENMRN_ENABLE_DCC ON)   # Need DCC support
+## Optional Modules (BLE/DCC)
 
-add_subdirectory(OpenMRNLite)
-target_link_libraries(my_project OpenMRNLite)
-```
+See [MIGRATION_MODULES.md](MIGRATION_MODULES.md) for information about the BLE and DCC optional modules.
 
-### Example 4: Using CMake Presets
-```bash
-# Copy the example presets file
-cp CMakePresets.example.json CMakePresets.json
+## Questions?
 
-# Build with default preset (all modules enabled)
-cmake --preset default
-cmake --build --preset default
-```
-
-## Benefits of This Change
-
-- **Smaller binaries by default:** Minimal footprint for projects that don't need BLE/DCC
-- **Faster builds:** Fewer files to compile by default
-- **Explicit dependencies:** Projects clearly declare what features they use
-- **Better for embedded:** Optimized flash and RAM usage out of the box
-
-## Support
-
-If you encounter issues during migration:
-
-1. Check the [OPTIONAL_MODULES.md](OPTIONAL_MODULES.md) documentation
-2. Review the [BUILD.md](BUILD.md) for build instructions
-3. Verify your CMake version is 3.12 or newer
-4. Check that feature flags are properly defined in your build
-
-## Upgrading from Previous Versions
-
-If you're upgrading from a version where these modules were enabled by default:
-
-```cmake
-# Enable modules that were previously included by default
-set(OPENMRN_ENABLE_BLE ON)
-set(OPENMRN_ENABLE_DCC ON)
-```
-
-This restores the behavior of previous versions where both modules were always included.
+See the example project at `examples/STM32H563_Nucleo_TX` for a complete working implementation.

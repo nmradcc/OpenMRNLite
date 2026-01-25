@@ -51,9 +51,7 @@
  * wherever the test is running). */
 class TempDir {
 public:
-#ifndef __FreeRTOS__
   TempDir();
-#endif
 
   ~TempDir() {
       if (::rmdir(dirName_.c_str()) != 0)

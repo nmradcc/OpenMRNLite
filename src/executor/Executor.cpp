@@ -134,7 +134,7 @@ public:
 
 void ExecutorBase::sync_run(std::function<void()> fn)
 {
-    if (os_thread_self() == selectHelper_.main_thread())
+    if (os_thread_self() == thread_handle())
     {
         // run inline.
         fn();
@@ -202,7 +202,6 @@ void *ExecutorBase::entry()
 {
     started_ = 1;
     sequence_ = 0;
-    selectHelper_.lock_to_thread();
     printf("[EXECUTOR] Entry function started, thread handle = %p\r\n", (void*)OSThread::get_handle());
     uint32_t loop_count = 0;
     fflush(stdout);
@@ -220,7 +219,7 @@ void *ExecutorBase::entry()
                        (unsigned long)loop_count, sequence_, (int)activeTimers_.empty(), wait_length);
                 fflush(stdout);
             }
-            wait_with_select(wait_length);
+            sleep_with_timeout(wait_length);
             selectPrescaler_ = config_executor_select_prescaler();
             msg = next(&priority);
         }
@@ -246,100 +245,34 @@ void *ExecutorBase::entry()
     return NULL;
 }
 
-void ExecutorBase::select(Selectable *job)
+void ExecutorBase::sleep_with_timeout(long long wait_length)
 {
-    fd_set *s = get_select_set(job->type());
-    int fd = job->fd_;
-    if (FD_ISSET(fd, s))
-    {
-        LOG(FATAL,
-            "Multiple Selectables are waiting for the same fd %d type %u", fd,
-            job->selectType_);
-    }
-    FD_SET(fd, s);
-    if (fd >= selectNFds_)
-    {
-        selectNFds_ = fd + 1;
-    }
-    HASSERT(!job->next);
-    // Inserts the job into the select queue.
-    selectables_.push_front(job);
-}
-
-bool ExecutorBase::is_selected(Selectable *job)
-{
-    fd_set *s = get_select_set(job->type());
-    int fd = job->fd_;
-    return FD_ISSET(fd, s);
-}
-
-void ExecutorBase::unselect(Selectable *job)
-{
-    fd_set *s = get_select_set(job->type());
-    int fd = job->fd_;
-    if (!FD_ISSET(fd, s))
-    {
-        LOG(FATAL, "Tried to remove a non-active selectable: fd %d type %u", fd,
-            job->selectType_);
-    }
-    FD_CLR((unsigned)fd, s);
-    auto it = selectables_.begin();
-    unsigned max_fd = 0;
-    while (it != selectables_.end())
-    {
-        if (&*it == job)
+    // Convert nanoseconds to milliseconds for ThreadX sleep
+    if (wait_length < 0) {
+        // Negative value means sleep indefinitely
+        wait_length = OPENMRN_OS_WAIT_FOREVER;
+    } else {
+        wait_length = NSEC_TO_MSEC(wait_length);
+        long long max_sleep = config_executor_max_sleep_msec();
+        if (wait_length > max_sleep)
         {
-            selectables_.erase(it);
-            continue;
+            wait_length = max_sleep;
         }
-        max_fd = std::max(max_fd, it->fd_ + 1U);
-        ++it;
     }
-    selectNFds_ = max_fd;
-}
-
-void ExecutorBase::wait_with_select(long long wait_length)
-{
-    fd_set fd_r(selectRead_);
-    fd_set fd_w(selectWrite_);
-    fd_set fd_x(selectExcept_);
-    // We will check the queue for any prior wakeups after this call. If we
-    // already processed the executables, the wakeup is not necessary. Without
-    // this clear, there would always be two select() iterations happening when
-    // we are done with work and can go to sleep.
-    selectHelper_.clear_wakeup();
-    if (!empty())
-    {
-        wait_length = 0;
+    
+    // ThreadX-based sleep: just yield to allow other threads to run
+    // Timers are handled by the main loop checking activeTimers_
+    if (!empty()) {
+        // If there's work to do, don't sleep
+        return;
     }
-    long long max_sleep = MSEC_TO_NSEC(config_executor_max_sleep_msec());
-    if (wait_length > max_sleep)
-    {
-        wait_length = max_sleep;
+    
+    // Sleep for the specified timeout
+    if (wait_length == OPENMRN_OS_WAIT_FOREVER) {
+        sleep(1000);  // Sleep for 1 second at a time to be responsive
+    } else if (wait_length > 0) {
+        usleep(wait_length * 1000);  // Convert ms to microseconds
     }
-    int ret = selectHelper_.select(selectNFds_, &fd_r, &fd_w, &fd_x, wait_length);
-    if (ret <= 0) {
-        return; // nothing to do
-    }
-    unsigned max_fd = 0;
-    for (auto it = selectables_.begin(); it != selectables_.end();) {
-        fd_set* s = nullptr;
-        fd_set* os = get_select_set(it->type());
-        switch(it->type()) {
-        case Selectable::READ: s = &fd_r; break;
-        case Selectable::WRITE: s = &fd_w; break;
-        case Selectable::EXCEPT: s = &fd_x; break;
-        }
-        if (FD_ISSET(it->fd_, s)) {
-            add(it->wakeup_, it->priority_);
-            FD_CLR(it->fd_, os);
-            selectables_.erase(it);
-            continue;
-        }
-        max_fd = std::max(max_fd, it->fd_ + 1U);
-        ++it;
-    }
-    selectNFds_ = max_fd;
 }
 
 void ExecutorBase::shutdown()

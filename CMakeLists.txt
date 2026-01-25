@@ -22,9 +22,8 @@ option(BUILD_SHARED_LIBS "Build shared libraries" OFF)
 option(OPENMRN_ENABLE_BLE "Enable BLE (Bluetooth Low Energy) support" OFF)
 option(OPENMRN_ENABLE_DCC "Enable DCC (Digital Command Control) support" OFF)
 
-# RTOS Selection (only one should be enabled)
-set(OPENMRN_RTOS "None" CACHE STRING "Select RTOS: FreeRTOS, ThreadX, CMSIS_RTOS_V2, or None")
-set_property(CACHE OPENMRN_RTOS PROPERTY STRINGS "FreeRTOS" "ThreadX" "CMSIS_RTOS_V2" "None")
+# ThreadX is the only supported RTOS
+message(STATUS "OpenMRNLite: ThreadX-only version")
 
 # Set default build type if not specified
 if(NOT CMAKE_BUILD_TYPE)
@@ -68,36 +67,10 @@ else()
     message(STATUS "DCC support: Disabled")
 endif()
 
-# Add platform-specific drivers only for FreeRTOS (they depend on FreeRTOS features)
-if(OPENMRN_RTOS STREQUAL "FreeRTOS")
-    file(GLOB_RECURSE FREERTOS_DRIVER_SOURCES
-        src/freertos_drivers/common/*.cpp
-        src/freertos_drivers/stm32/*.cpp
-    )
-    list(APPEND OPENMRNLITE_SOURCES ${FREERTOS_DRIVER_SOURCES})
-endif()
-
-# Add OS layer sources based on RTOS selection
-if(OPENMRN_RTOS STREQUAL "ThreadX")
-    # Include ThreadX-specific implementation and os.c for global symbols
-    file(GLOB OS_SOURCES src/os/*.cpp src/os/threadx_impl.c src/os/os.c)
-    # Exclude MDNS.cpp and OS.cpp which require full select() support (OSSelectWakeup has ThreadX support)
-    list(FILTER OS_SOURCES EXCLUDE REGEX ".*/(MDNS|OS)\\.cpp$")
-elseif(OPENMRN_RTOS STREQUAL "CMSIS_RTOS_V2")
-    # CMSIS-RTOS v2: include OS shims and C implementations for time and buffer allocation
-    file(GLOB OS_SOURCES src/os/*.cpp src/os/cmsis_rtos2_impl.c src/os/cmsis_time.c src/os/stack_malloc.c)
-    list(FILTER OS_SOURCES EXCLUDE REGEX ".*/(MDNS|OSSelectWakeup|OS)\\.cpp$")
-elseif(OPENMRN_RTOS STREQUAL "FreeRTOS")
-    # FreeRTOS: include OS shims and C implementations for time and malloc wrappers
-    file(GLOB OS_SOURCES src/os/*.cpp src/os/freertos_impl.c src/os/freertos_time.c src/os/stack_malloc.c)
-    # Exclude MDNS.cpp and OSSelectWakeup.cpp which are not compatible with embedded FreeRTOS
-    list(FILTER OS_SOURCES EXCLUDE REGEX ".*/(MDNS|OSSelectWakeup)\\.cpp$")
-else() 
-    # No RTOS - minimal OS layer without POSIX dependencies
-    file(GLOB OS_SOURCES src/os/*.cpp src/os/stack_malloc.c)
-    list(FILTER OS_SOURCES EXCLUDE REGEX ".*/(MDNS|OSSelectWakeup|OS)\\.cpp$")
-endif()
-
+# ThreadX OS layer sources
+file(GLOB OS_SOURCES src/os/*.cpp src/os/threadx_impl.c src/os/os.c)
+# Exclude MDNS.cpp and OS.cpp which require full select() support
+list(FILTER OS_SOURCES EXCLUDE REGEX ".*/(MDNS|OS)\\.cpp$")
 list(APPEND OPENMRNLITE_SOURCES ${OS_SOURCES})
 
 # Collect all header files
@@ -142,64 +115,26 @@ if(OPENMRN_ENABLE_DCC)
     target_compile_definitions(OpenMRNLite PUBLIC OPENMRN_FEATURE_DCC=1)
 endif()
 
-# Add RTOS-specific definitions
-if(OPENMRN_RTOS STREQUAL "ThreadX")
-    target_compile_definitions(OpenMRNLite PUBLIC
-        OPENMRN_FEATURE_RTOS_THREADX=1
-        USING_THREADX=1
-    )
-    message(STATUS "RTOS: ThreadX")
-    
-    # Link to stm32cubemx target if it exists (provides ThreadX headers)
-    if(TARGET stm32cubemx)
-        # Get include directories from stm32cubemx without creating a link dependency
-        get_target_property(STM32CUBEMX_INCLUDES stm32cubemx INTERFACE_INCLUDE_DIRECTORIES)
-        if(STM32CUBEMX_INCLUDES)
-            target_include_directories(OpenMRNLite PRIVATE ${STM32CUBEMX_INCLUDES})
-            message(STATUS "  Using stm32cubemx includes for ThreadX")
-        endif()
-        
-        # Get compile definitions from stm32cubemx
-        get_target_property(STM32CUBEMX_DEFINES stm32cubemx INTERFACE_COMPILE_DEFINITIONS)
-        if(STM32CUBEMX_DEFINES)
-            target_compile_definitions(OpenMRNLite PRIVATE ${STM32CUBEMX_DEFINES})
-        endif()
+# ThreadX-specific definitions
+target_compile_definitions(OpenMRNLite PUBLIC
+    OPENMRN_FEATURE_RTOS_THREADX=1
+    USING_THREADX=1
+)
+
+# Link to stm32cubemx target if it exists (provides ThreadX headers)
+if(TARGET stm32cubemx)
+    # Get include directories from stm32cubemx without creating a link dependency
+    get_target_property(STM32CUBEMX_INCLUDES stm32cubemx INTERFACE_INCLUDE_DIRECTORIES)
+    if(STM32CUBEMX_INCLUDES)
+        target_include_directories(OpenMRNLite PRIVATE ${STM32CUBEMX_INCLUDES})
+        message(STATUS "  Using stm32cubemx includes for ThreadX")
     endif()
-elseif(OPENMRN_RTOS STREQUAL "CMSIS_RTOS_V2")
-    target_compile_definitions(OpenMRNLite PUBLIC
-        OPENMRN_FEATURE_RTOS_CMSIS_V2=1
-        USING_CMSIS_RTOS_V2=1
-    )
-    message(STATUS "RTOS: CMSIS-RTOS v2")
     
-    # Link to stm32cubemx target if it exists (provides CMSIS-RTOS v2 headers)
-    if(TARGET stm32cubemx)
-        # Get include directories from stm32cubemx without creating a link dependency
-        get_target_property(STM32CUBEMX_INCLUDES stm32cubemx INTERFACE_INCLUDE_DIRECTORIES)
-        if(STM32CUBEMX_INCLUDES)
-            target_include_directories(OpenMRNLite PRIVATE ${STM32CUBEMX_INCLUDES})
-            message(STATUS "  Using stm32cubemx includes for CMSIS-RTOS v2")
-        endif()
-        
-        # Get compile definitions from stm32cubemx
-        get_target_property(STM32CUBEMX_DEFINES stm32cubemx INTERFACE_COMPILE_DEFINITIONS)
-        if(STM32CUBEMX_DEFINES)
-            target_compile_definitions(OpenMRNLite PRIVATE ${STM32CUBEMX_DEFINES})
-        endif()
+    # Get compile definitions from stm32cubemx
+    get_target_property(STM32CUBEMX_DEFINES stm32cubemx INTERFACE_COMPILE_DEFINITIONS)
+    if(STM32CUBEMX_DEFINES)
+        target_compile_definitions(OpenMRNLite PRIVATE ${STM32CUBEMX_DEFINES})
     endif()
-elseif(OPENMRN_RTOS STREQUAL "FreeRTOS")
-    target_compile_definitions(OpenMRNLite PUBLIC
-        OPENMRN_FEATURE_MUTEX_FREERTOS=1
-        OPENMRN_FEATURE_RTOS_FREERTOS=1
-        __FreeRTOS__=1
-    )
-    message(STATUS "RTOS: FreeRTOS")
-else() # None (default)
-    target_compile_definitions(OpenMRNLite PUBLIC
-        OPENMRN_FEATURE_MUTEX_FAKE=1
-        OPENMRN_FEATURE_SINGLE_THREADED=1
-    )
-    message(STATUS "RTOS: None (single-threaded/bare-metal) default")
 endif()
 
 # Installation
@@ -257,7 +192,7 @@ message(STATUS "")
 message(STATUS "OpenMRNLite Configuration Summary:")
 message(STATUS "  Version:           ${PROJECT_VERSION}")
 message(STATUS "  Build type:        ${CMAKE_BUILD_TYPE}")
-message(STATUS "  RTOS:              ${OPENMRN_RTOS}")
+message(STATUS "  RTOS:              ThreadX (exclusive)")
 message(STATUS "  Target system:     ${CMAKE_SYSTEM_NAME}")
 message(STATUS "  Target processor:  ${CMAKE_SYSTEM_PROCESSOR}")
 message(STATUS "  Toolchain file:    ${CMAKE_TOOLCHAIN_FILE}")

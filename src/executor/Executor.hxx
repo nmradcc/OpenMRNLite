@@ -41,14 +41,12 @@
 
 #include "executor/Executable.hxx"
 #include "executor/Notifiable.hxx"
-#include "executor/Selectable.hxx"
 #include "executor/Timer.hxx"
 #include "utils/Queue.hxx"
 #include "utils/SimpleQueue.hxx"
 #include "utils/LinkedObject.hxx"
 #include "utils/logging.h"
 #include "utils/macros.h"
-#include "os/OSSelectWakeup.hxx"
 
 class ActiveTimers;
 
@@ -91,35 +89,6 @@ public:
     virtual void add_from_isr(Executable *action,
                               unsigned priority = UINT_MAX) = 0;
 #endif // OPENMRN_FEATURE_RTOS_FROM_ISR
-
-    /** Adds a file descriptor to be watched to the select loop.
-     * @param job Selectable structure that describes the descriptor to watch.
-     * The pointer must stay alive until it is activated, or is unselected.
-     *
-     * Must be called on the executor thread.
-     *
-     * @param job is a Selectable pointer that is not currently watched.
-     */
-    void select(Selectable* job);
-
-    /** @return true if the given job's FD is currently enqueued for a
-     * select. This may or may not mean that the specific job is waiting for a
-     * select call. If this returns true, it does mean that trying to select()
-     * that job will cause a crash, since the same FD cannot be selected more
-     * than once.
-     * @param job is the selectable to query. */
-    bool is_selected(Selectable* job);
-
-    /** Removes a job from the select loop.
-     *
-     * This stops watching the given file descriptor. The job must have been
-     * previously inserted into the Executor and must be not yet activated.
-     *
-     * Must be called on the executor thread.
-     *
-     * @param job is a Selectable pointer that was previously inserted.
-     */
-    void unselect(Selectable* job);
 
     /** Performs one loop of the execution on the calling thread. @return true
      * if there is more scheduled work to do. Returns false if the executor
@@ -168,10 +137,7 @@ protected:
     void *entry() override;
 
     void run() override {}
-
-    /** Helper object for interruptible select calls. */
-    OSSelectWakeup selectHelper_;
-
+    
 private:
     /** Retrieve an item from the front of the queue.
      * @param priority pass back the priority of the queue pulled from
@@ -179,30 +145,11 @@ private:
      */
     virtual Executable *next(unsigned *priority) = 0;
 
-    /** Executes a select call, and schedules any necessary executables based
-     * on the return. Will not sleep at all if not empty, otherwise sleeps at
-     * most next_timer_nsec nanoseconds (from now).
+    /** Sleep for the specified time until an executable becomes available or
+     * timeout occurs.
      *
      * @param next_timer_nsec is the maximum time to sleep in nanoseconds. */
-    void wait_with_select(long long next_timer_nsec);
-
-    /// Helper function.
-    ///
-    /// @param type a select type: READ, WRITE or EXCEPT
-    ///
-    /// @return the fd_set that's being waited for that given select type.
-    ///
-    fd_set *get_select_set(Selectable::SelectType type)
-    {
-        switch (type)
-        {
-        case Selectable::READ: return &selectRead_;
-        case Selectable::WRITE: return &selectWrite_;
-        case Selectable::EXCEPT: return &selectExcept_;
-        }
-        LOG(FATAL, "Unexpected select type %d", type);
-        return nullptr;
-    }
+    void sleep_with_timeout(long long next_timer_nsec);
 
     /** name of this Executor */
     const char *name_;
@@ -212,17 +159,6 @@ private:
 
     /** List of active timers. */
     ActiveTimers activeTimers_;
-
-    /** fd to select for read. */
-    fd_set selectRead_;
-    /** fd to select for write. */
-    fd_set selectWrite_;
-    /** fd to select for except. */
-    fd_set selectExcept_;
-    /** maximum fd to select for + 1 */
-    int selectNFds_;
-    /** Head of the linked list for the select calls. */
-    TypedQueue<Selectable> selectables_;
 
     /** Set to 1 when the executor thread has exited and it is safe to delete
      * *this. */

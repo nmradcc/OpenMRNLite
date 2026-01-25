@@ -25,8 +25,7 @@
  * POSSIBILITY OF SUCH DAMAGE.
  *
  * \file rtos_includes.h
- * This file simplifies the include path for RTOS header files and provides
- * unified abstractions for FreeRTOS, ThreadX, and CMSIS-RTOS v2.
+ * ThreadX RTOS includes for OpenMRNLite (ThreadX-only version)
  *
  * @date 17 December 2025
  */
@@ -36,30 +35,11 @@
 
 #include "openmrn_features.h"
 
-// Detect which RTOS is being used
-#if defined(OPENMRN_FEATURE_RTOS_FREERTOS)
-    #define USING_FREERTOS 1
-    #include "FreeRTOS.h"
-    #include "task.h"
-    #include "semphr.h"
-    #include "queue.h"
-    // Convert nanoseconds to FreeRTOS ticks
-    #define NSEC_TO_TICK(ns) ((TickType_t)(((ns) * (uint64_t)configTICK_RATE_HZ) / 1000000000ULL))
+// ThreadX is the only supported RTOS
+#define USING_THREADX 1
+#include "tx_api.h"
 
-#elif defined(OPENMRN_FEATURE_RTOS_THREADX)
-    #define USING_THREADX 1
-    #include "tx_api.h"
-    // ThreadX tick conversion (assuming 1000Hz = 1ms tick rate)
-    #define NSEC_TO_TICK(ns) (((ns) * TX_TIMER_TICKS_PER_SECOND) / 1000000000ULL)
-
-#elif defined(OPENMRN_FEATURE_RTOS_CMSIS_V2)
-    #define USING_CMSIS_RTOS_V2 1
-    #include "cmsis_os2.h"
-    // CMSIS-RTOS v2 tick conversion
-    #define NSEC_TO_TICK(ns) (((ns) * osKernelGetTickFreq()) / 1000000000ULL)
-
-#else
-    #error "No RTOS selected. Define OPENMRN_FEATURE_RTOS_FREERTOS, OPENMRN_FEATURE_RTOS_THREADX, or OPENMRN_FEATURE_RTOS_CMSIS_V2"
-#endif
+// ThreadX tick conversion (assuming 1000Hz = 1ms tick rate)
+#define NSEC_TO_TICK(ns) (((ns) * TX_TIMER_TICKS_PER_SECOND) / 1000000000ULL)
 
 #endif // _RTOS_INCLUDES_H_

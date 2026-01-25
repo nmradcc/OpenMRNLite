@@ -54,11 +54,7 @@ static void* watchdog_thread(void* arg)
         usleep(((useconds_t)1000) * watchdog_period_msec);
         if (++watchdog_ticks > 1)
         {
-#ifdef __FreeRTOS__
-            diewith(BLINK_DIE_WATCHDOG);
-#else
             abort();
-#endif
         }
     }
     return NULL;
@@ -68,11 +64,7 @@ void start_watchdog(int period_msec)
 {
     watchdog_period_msec = period_msec;
     reset_watchdog();
-#ifdef __FreeRTOS__
-    const int kStackSize = 256;
-#else
-    const int kStackSize = 2048;
-#endif
+    const int kStackSize = 256; // ThreadX embedded system
     os_thread_create(NULL, "watchdog", 0, kStackSize,
                      &watchdog_thread, NULL);
 }

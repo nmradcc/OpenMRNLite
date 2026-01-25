@@ -33,9 +33,7 @@
  */
 
 /// Overrides loglevel.
-#ifndef __FreeRTOS__
 #define LOGLEVEL INFO
-#endif
 
 #include <sys/stat.h>
 #include <sys/types.h>

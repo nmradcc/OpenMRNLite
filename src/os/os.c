@@ -44,27 +44,8 @@
 #include <fcntl.h>
 #include <unistd.h>
 
-#if defined (__FreeRTOS__)
-#include "devtab.h"
-#include "FreeRTOS.h"
-#include "task.h"
-
-#elif defined(OPENMRN_FEATURE_RTOS_THREADX)
-// ThreadX build: include ThreadX API, avoid POSIX headers
+// ThreadX build: include ThreadX API
 #include "tx_api.h"
-
-#elif defined(OPENMRN_FEATURE_RTOS_CMSIS_V2)
-// CMSIS-RTOS v2 build: include CMSIS headers, avoid POSIX headers
-#include "cmsis_os2.h"
-
-#else
-
-#include <sys/select.h>
-#include <sched.h>
-#include <time.h>
-#include <signal.h>
-
-#endif // switch by OS
 
 #include "nmranet_config.h"
 
@@ -98,28 +79,6 @@ long long rtcOffset = 0;
  * version) that does not forward these function calls to the implementations
  * we have. We are thus forced to override their weak definition of these
  * functions. */
-
-#if OPENMRN_FEATURE_THREAD_FREERTOS
-/// Task list entriy
-typedef struct task_list
-{
-    xTaskHandle task; ///< list entry data
-    char * name; ///< name of task
-    size_t unused; ///< number of bytes left unused in the stack
-    struct task_list *next; ///< next link in the list
-} TaskList;
-
-/** Private metadata for starting a thread.
- */
-typedef struct
-{
-    void *(*entry)(void*); /**< thread entry point */
-    void *arg; /**< argument to thread */
-    TaskList *taskList; /**< task list instance */
-} OSThreadStartPriv;
-
-/** List of all the tasks in the system */
-static TaskList *taskList = NULL;
 
 /** Mutex for os_thread_once. */
 static os_mutex_t onceMutex = OS_MUTEX_INITIALIZER;
@@ -186,127 +145,6 @@ int os_thread_once(os_thread_once_t *once, void (*routine)(void))
 }
 #endif
 
-#if OPENMRN_FEATURE_THREAD_FREERTOS
-extern const void* stack_malloc(unsigned long length);
-
-/** Add a thread to the task list for tracking.
- * @param task_new metadata for new task
- */
-void add_thread_to_task_list(TaskList *task_new)
-{
-    vTaskSuspendAll();
-    task_new->next = taskList;
-    taskList = task_new;
-    xTaskResumeAll();
-}
-
-/** Delete a thread from the task list for tracking.
- * @param task_handle FreeRTOS task handle to delete
- */
-void del_thread_from_task_list(TaskHandle_t task_handle)
-{
-    vTaskSuspendAll();
-    TaskList *tl;
-    for (tl = taskList; tl != NULL && tl->task != task_handle; tl = tl->next)
-    {
-    }
-    if (tl)
-    {
-        tl->task = NULL;
-        tl->name = NULL;
-        tl->unused = DELETED_TASK_MAGIC;
-    }
-    xTaskResumeAll();
-}
-
-/** Do any platform specific work at the beginning of os_thread_start().
- */
-void __attribute__((weak)) os_thread_start_entry_hook(void)
-{
-}
-
-/** Do any platform specific work at the end of os_thread_start().
- * @param thread return context
- */
-void __attribute__((weak)) os_thread_start_exit_hook(void *context)
-{
-    vTaskDelete(NULL);
-}
-
-/** Entry point to a thread.
- * @param arg metadata for entering the thread
- */
-void os_thread_start(void *arg)
-{
-    os_thread_start_entry_hook();
-
-    // add ourselves to the task list
-    OSThreadStartPriv *priv = (OSThreadStartPriv*)arg;
-    priv->taskList->task = xTaskGetCurrentTaskHandle();
-    add_thread_to_task_list(priv->taskList);
-
-#if OPENMRN_FEATURE_DEVICE_SELECT    
-    // init thread local storage to
-#if tskKERNEL_VERSION_MAJOR >= 9
-    // FreeRTOS 9.x+ implementation
-    vTaskSetThreadLocalStoragePointer(NULL, TLS_INDEX_SELECT_EVENT_BIT, NULL);
-#else
-    // legacy implementation uses task tag
-    vTaskSetApplicationTaskTag(NULL, NULL);
-#endif // tskKERNEL_VERSION_MAJOR
-#endif // OPENMRN_FEATURE_DEVICE_SELECT
-
-    // execute thread entry point
-    void *result = (*priv->entry)(priv->arg);
-
-    // remove ourselves from task list
-    del_thread_from_task_list(xTaskGetCurrentTaskHandle());
-
-    // We purposesly do not free priv->taskList.  Though it is technically a
-    // leak, we keep it around for diagnostic purposes.
-
-    free(arg);
-
-    os_thread_start_exit_hook(result);
-}
-#endif // OPENMRN_FEATURE_THREAD_FREERTOS
-
-#ifndef OPENMRN_FEATURE_SINGLE_THREADED
-
-#if OPENMRN_FEATURE_THREAD_FREERTOS
-/** Create a thread helper.
- * @param thread handle to the created thread
- * @param name name of thread, NULL for an auto generated name
- * @param priority priority of created thread, 0 means default,
- *        lower numbers means lower priority, higher numbers mean higher priority
- * @param stack_size size in bytes of the created thread's stack
- * @param priv thread matadata parameter
- * @return 0 upon success or error number upon failure
- */
-int __attribute__((weak)) os_thread_create_helper(os_thread_t *thread,
-                                                  const char *name,
-                                                  int priority,
-                                                  size_t stack_size,
-                                                  void *priv)
-{
-    HASSERT(thread);
-#if (configSUPPORT_DYNAMIC_ALLOCATION == 1)
-    xTaskCreate(os_thread_start, (const char *const)name,
-                stack_size/sizeof(portSTACK_TYPE), priv, priority, thread);
-#elif (configSUPPORT_STATIC_ALLOCATION == 1)
-    *thread = xTaskCreateStatic(os_thread_start, (const char *const)name,
-                                stack_size/sizeof(portSTACK_TYPE), priv,
-                                priority,
-                                (StackType_t *)stack_malloc(stack_size),
-                                (StaticTask_t *) malloc(sizeof(StaticTask_t)));
-#else
-#error FREERTOS version v9.0.0 or later required
-#endif // configSUPPORT_STATIC_ALLOCATION
-    return 0;
-}
-#endif // OPENMRN_FEATURE_THREAD_FREERTOS
-
-#if !defined(OPENMRN_FEATURE_RTOS_THREADX)
 /** Create a thread.
  * @param thread handle to the created thread
  * @param name name of thread, NULL for an auto generated name
@@ -334,44 +172,6 @@ int os_thread_create(os_thread_t *thread, const char *name, int priority,
         name = auto_name;
     }
 
-#if OPENMRN_FEATURE_THREAD_FREERTOS
-    OSThreadStartPriv *priv =
-        (OSThreadStartPriv*)malloc(sizeof(OSThreadStartPriv));
-
-    priv->taskList = (TaskList*)malloc(sizeof(TaskList));
-    priv->taskList->name = NULL;
-    priv->entry = start_routine;
-    priv->arg = arg;
-
-    priv->taskList->unused = stack_size;
-    if (priority == 0)
-    {
-        priority = configMAX_PRIORITIES / 2;
-    }
-    else if (priority >= configMAX_PRIORITIES)
-    {
-        priority = configMAX_PRIORITIES - 1;
-    }
-    
-    if (stack_size == 0)
-    {
-        stack_size = 2048;
-    }
-    
-    os_thread_t local_thread;
-    int result =  os_thread_create_helper(&local_thread, name, priority,
-                                          stack_size, priv);
-    if (result == 0)
-    {
-        priv->taskList->task = local_thread;
-        priv->taskList->name = (char*)pcTaskGetTaskName(local_thread);
-        if (thread)
-        {
-            *thread = local_thread;
-        }
-    }
-    return result;
-#endif // OPENMRN_FEATURE_THREAD_FREERTOS
 #if OPENMRN_FEATURE_THREAD_PTHREAD    
     pthread_attr_t attr;
 
@@ -431,7 +231,6 @@ int os_thread_create(os_thread_t *thread, const char *name, int priority,
 #endif // OPENMRN_FEATURE_THREAD_PTHREAD
 }
 #endif // !OPENMRN_FEATURE_RTOS_THREADX
-#endif // !OPENMRN_FEATURE_SINGLE_THREADED
 
 /// Implement this function to read timing more accurately than 1 msec in
 /// FreeRTOS.
@@ -443,11 +242,7 @@ long long os_get_time_monotonic(void)
 {
     static long long last = 0;
     long long time;
-#if defined (__FreeRTOS__)
-    portTickType tick = xTaskGetTickCount();
-    time = ((long long)tick) << NSEC_TO_TICK_SHIFT;
-    time += hw_get_partial_tick_time_nsec();
-#elif defined(OPENMRN_FEATURE_RTOS_THREADX)
+    
     // ThreadX uses TX_TIMER_TICKS_PER_SECOND for tick frequency
     // Get current tick count
     extern unsigned long tx_time_get(void);
@@ -458,12 +253,7 @@ long long os_get_time_monotonic(void)
     #define TX_TIMER_TICKS_PER_SECOND 100
     #endif // TX_TIMER_TICKS_PER_SECOND
     time = ((long long)tick * 1000000000LL) / TX_TIMER_TICKS_PER_SECOND;
-#else
-    struct timespec ts;
-    clock_gettime(CLOCK_MONOTONIC, &ts);
-    time = ((long long)ts.tv_sec * 1000000000LL) + ts.tv_nsec;
 
-#endif
     /* This logic ensures that every successive call is one value larger
      * than the last.  Each call returns a unique value.
      */
@@ -482,79 +272,15 @@ long long os_get_time_monotonic(void)
     return time;
 }
 
-/* ==================== FreeRTOS-specific implementations ==================== */
-#if defined (__FreeRTOS__)
-
-/* standard C library hooks for multi-threading */
-
-/** Lock access to malloc.
- */
-void __malloc_lock(void)
-{
-    if (xTaskGetSchedulerState() != taskSCHEDULER_NOT_STARTED)
-    {
-        vTaskSuspendAll();
-    }
-}
-
-/** Unlock access to malloc.
- */
-void __malloc_unlock(void)
-{
-    if (xTaskGetSchedulerState() != taskSCHEDULER_NOT_STARTED)
-    {
-        xTaskResumeAll();
-    }
-}
-
-#if defined (_REENT_SMALL)
-void *__real__malloc_r(size_t size);
-void __real__free_r(void *address);
-
-/** malloc() wrapper for newlib-nano
- * @param size size of malloc in bytes
- * @return pointer to newly malloc'd space
- */
-void *__wrap__malloc_r(size_t size)
-{
-    void *result;
-    __malloc_lock();
-    result = __real__malloc_r(size);
-    __malloc_unlock();
-    return result;
-}
-
-/** free() wrapper for newlib-nano
- * @param address pointer to previously malloc'd address
- */
-void __wrap__free_r(void *address)
-{
-    __malloc_lock();
-    __real__free_r(address);
-    __malloc_unlock();
-}
-#endif // _REENT_SMALL
-
-#endif // __FreeRTOS__
-
-/* ==================== RTOS-agnostic standard library implementations ==================== */
+// ThreadX-specific standard library implementations
 
 /** Implementation of standard sleep().
  * @param seconds number of seconds to sleep
  */
 unsigned sleep(unsigned seconds)
 {
-#if defined(__FreeRTOS__)
-    vTaskDelay(seconds * configTICK_RATE_HZ);
-#elif defined(OPENMRN_FEATURE_RTOS_THREADX)
     extern unsigned int tx_thread_sleep(unsigned long ticks);
     tx_thread_sleep(seconds * TX_TIMER_TICKS_PER_SECOND);
-#else
-    struct timespec ts;
-    ts.tv_sec = seconds;
-    ts.tv_nsec = 0;
-    nanosleep(&ts, NULL);
-#endif // FreeRTOS vs ThreadX vs POSIX
     return 0;
 }
 
@@ -563,186 +289,26 @@ unsigned sleep(unsigned seconds)
  */
 int usleep(useconds_t usec)
 {
-#if defined(__FreeRTOS__)
-    long long nsec = usec;
-    nsec *= 1000;
-    vTaskDelay(nsec >> NSEC_TO_TICK_SHIFT);
-    return 0;
-#elif defined(OPENMRN_FEATURE_RTOS_THREADX)
     // Convert microseconds to ThreadX ticks
     extern unsigned int tx_thread_sleep(unsigned long ticks);
     unsigned long ticks = (usec * TX_TIMER_TICKS_PER_SECOND) / 1000000;
     if (ticks == 0 && usec > 0) ticks = 1;
     tx_thread_sleep(ticks);
     return 0;
-#else
-    // Generic POSIX implementation
-    struct timespec ts;
-    ts.tv_sec = usec / 1000000;
-    ts.tv_nsec = (usec % 1000000) * 1000;
-    return nanosleep(&ts, NULL);
-#endif // FreeRTOS vs ThreadX vs POSIX
 }
 
 void abort(void)
 {
-#if defined(TARGET_LPC2368) || \
-    defined(TARGET_LPC1768) || defined(GCC_ARMCM3) || defined (GCC_ARMCM0)
-    diewith(BLINK_DIE_ABORT);
-#endif // TARGET_LPC*
     for (;;)
     {
     }
 }
 
-/* ==================== FreeRTOS-specific heap and task management ==================== */
-#if defined (__FreeRTOS__)
-
-/* magic that allows for an optional second heap region */
-char __attribute__((weak)) __heap2_start_alias;
-extern char __heap2_start __attribute__((weak, alias ("__heap2_start_alias")));
-extern char __heap2_end __attribute__((weak, alias ("__heap2_start_alias")));
-
-extern char *heap_end;
-char *heap_end = 0;
-extern char *heap2_end;
-char *heap2_end = 0;
-void* _sbrk_r(struct _reent *reent, ptrdiff_t incr)
-{
-    /** @todo (Stuart Baker) change naming to remove "cs3" convention */
-    extern char __cs3_heap_start;
-    extern char __cs3_heap_end; /* Defined by the linker */
-    char *prev_heap_end;
-    if (heap_end == 0)
-    {
-        heap_end = &__cs3_heap_start;
-    }
-    if (heap2_end == 0)
-    {
-        heap2_end = &__heap2_start;
-    }
-    prev_heap_end = heap_end;
-    if ((heap_end + incr) > &__cs3_heap_end)
-    {
-        if (&__heap2_start != &__heap2_end)
-        {
-            /* there is a second heap */
-            char *prev_heap2_end;
-            prev_heap2_end = heap2_end;
-            if ((heap2_end + incr) <= &__heap2_end)
-            {
-                heap2_end += incr;
-                return (caddr_t) prev_heap2_end;
-            }
-        }
-        /* Heap and stack collistion */
-        diewith(BLINK_DIE_OUTOFMEM);
-        return 0;
-    }
-    heap_end += incr;
-    return (caddr_t) prev_heap_end;
-}
-
-ssize_t os_get_free_heap()
-{
-    /** @todo (Stuart Baker) change naming to remove "cs3" convention */
-    extern char __cs3_heap_end; /* Defined by the linker */
-    uint32_t fh = &__cs3_heap_end - heap_end;
-    fh += (&__heap2_end - heap2_end);
-    return fh;
-}
-
-xTaskHandle volatile overflowed_task = 0;
-signed portCHAR * volatile overflowed_task_name = 0;
-
-/** This method is called if a stack overflows its boundries.
- * @param task task handle for violating task
- * @param name name of violating task
- */
-void vApplicationStackOverflowHook(xTaskHandle task, signed portCHAR *name)
-{
-    overflowed_task = task;
-    overflowed_task_name = name;
-    diewith(BLINK_DIE_STACKOVERFLOW);
-}
-
-/** This method will be called repeatedly from the idle task. If needed, it can
- * be overridden in hw_init.c.
- */
-void hw_idle_hook(void) __attribute__((weak));
-
-void hw_idle_hook(void)
-{
-}
-
-/** Here we will monitor the other tasks.
- */
-void vApplicationIdleHook( void )
-{
-    hw_idle_hook();
-    vTaskSuspendAll();
-    // First we clean up all deleted tasks.
-    for (TaskList **ptl = &taskList; *ptl != NULL;)
-    {
-        if ((*ptl)->unused == DELETED_TASK_MAGIC)
-        {
-            TaskList *tl = *ptl;
-            *ptl = tl->next;
-            free(tl);
-        }
-        else
-        {
-            ptl = &((*ptl)->next);
-        }
-    }
-    // Then we scan through the tasks and update the free stack values.
-    for (TaskList *tl = taskList; tl != NULL; tl = tl->next)
-    {
-        if (tl->task)
-        {
-            tl->unused = uxTaskGetStackHighWaterMark(tl->task) *
-                         sizeof(portSTACK_TYPE);
-        }
-        xTaskResumeAll();
-        vTaskSuspendAll();
-    }
-    xTaskResumeAll();
-}
-
-static inline void __attribute__((always_inline)) os_yield_trampoline(void)
-{
-    taskYIELD();
-}
-
-/** Entry point to the main thread.
- * @param arg unused argument
- * @return NULL;
- */
-static void *main_thread(void *unused)
-{
-    char *argv[2] = {(char*)"openmrn", NULL};
-
-    /* Allow any library threads to run that must run ahead of main */
-    os_yield_trampoline();
-
-    /* Give another chance to the board file to do work, this time coordinating
-     * between application and library threads. */
-    hw_postinit();
-
-    appl_main(1, argv);
-    // If the main thread returns, FreeRTOS usually crashes the CPU in a
-    // hard-to-debug state. Let's avoid that.
-    abort();
-    return NULL;
-}
-#else // !__FreeRTOS__
-
+// ThreadX implementation - no special heap management needed
 ssize_t __attribute__((weak)) os_get_free_heap()
 {
     return -1;
 }
-
-#endif // __FreeRTOS__
 
 /** This function does nothing. It can be used to alias other symbols to it via
  * linker flags, such as atexit(). @return 0. */
@@ -760,41 +326,6 @@ int main(int argc, char *argv[]) __attribute__ ((weak));
  */
 int main(int argc, char *argv[])
 {
-#if defined (__FreeRTOS__)
-    /* initialize the processor hardware */
-    hw_init();
-
-    /* stdin */
-    if (open(STDIN_DEVICE, O_RDWR) < 0)
-    {
-        open("/dev/null", O_RDWR);
-    }
-    /* stdout */
-    if (open(STDOUT_DEVICE, O_RDWR) < 0)
-    {
-        open("/dev/null", O_RDWR);
-    }
-    /* stderr */
-    if (open(STDERR_DEVICE, O_WRONLY) < 0)
-    {
-        open("/dev/null", O_WRONLY);
-    }
-
-    int priority;
-    if (config_main_thread_priority() == 0xdefa01)
-    {
-        priority = configMAX_PRIORITIES / 2;
-    }
-    else
-    {
-        priority = config_main_thread_priority();
-    }
-
-    os_thread_create(NULL, "thread.main", priority,
-                     config_main_thread_stack_size(), main_thread, NULL);
-
-    vTaskStartScheduler();
-#else // !__FreeRTOS__
+    // ThreadX: initialization handled by ThreadX application
     return appl_main(argc, argv);
-#endif // __FreeRTOS__
 }

@@ -44,10 +44,6 @@
 
 #include "openmrn_features.h"
 
-#if OPENMRN_FEATURE_DEVICE_SELECT
-#include <event_groups.h>
-#endif
-
 #include "utils/macros.h"
 
 #ifdef __cplusplus
@@ -90,20 +86,13 @@ enum
 #define OS_THREAD_ONCE_INIT { OS_THREAD_ONCE_NEVER }
 
 // ============================================================================
-// Include RTOS-specific implementations
+// Include ThreadX RTOS implementation
 // ============================================================================
 
-#if defined(OPENMRN_FEATURE_RTOS_FREERTOS) || defined(OPENMRN_FEATURE_RTOS_THREADX) || defined(OPENMRN_FEATURE_RTOS_CMSIS_V2)
 #include "rtos_includes.h"
-#endif
-
-#if defined(OPENMRN_FEATURE_RTOS_FREERTOS)
-#include "os/freertos_impl.h"
-#elif defined(OPENMRN_FEATURE_RTOS_THREADX)
 #include "os/threadx_impl.h"
-#elif defined(OPENMRN_FEATURE_RTOS_CMSIS_V2)
-#include "os/cmsis_rtos2_impl.h"
-#else
+
+#if 0 // Legacy fallback code - not used in ThreadX-only version
 // Fallback for single-threaded environments or when no RTOS is configured
 typedef struct {
     int locked;
@@ -366,16 +355,7 @@ int appl_main(int argc, char *argv[]);
 /// @return the available heap or -1 if this operation is not supported.
 ssize_t os_get_free_heap(void);
 
-#if defined (__FreeRTOS__)
-
-extern void hw_init(void);
-
-/** Stack size of the main thread */
-extern const size_t main_stack_size;
-
-/** priority of the main thread */
-extern const int main_priority;
-#endif
+// Legacy FreeRTOS-specific declarations removed
 
 #ifndef container_of
 /** Get a pointer to the parent structure of one of its members.

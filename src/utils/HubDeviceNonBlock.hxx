@@ -45,10 +45,6 @@
 #include "can_ioctl.h"
 #include "utils/Hub.hxx"
 
-#ifdef __FreeRTOS__
-extern int ioctl(int fd, unsigned long int key, ...);
-#endif // __FreeRTOS__
-
 template <class HFlow> class HubDeviceNonBlock : public Destructable, private Atomic, public Service
 {
 public:

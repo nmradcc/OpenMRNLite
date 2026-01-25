@@ -56,17 +56,4 @@
 #define OPENMRN_FEATURE_DCC 0
 #endif
 
-// ============================================================================
-// RTOS-specific features are defined in os/*_impl.h files:
-// - freertos_impl.h: FreeRTOS features
-// - threadx_impl.h: ThreadX features  
-// - cmsis_rtos2_impl.h: CMSIS-RTOS v2 features
-// ============================================================================
-
-#if OPENMRN_FEATURE_SINGLE_THREADED
-/// Add a fake implementation for os_mutex_lock that crashes if there is a
-/// conflict.
-#define OPENMRN_FEATURE_MUTEX_FAKE 1
-#endif
-
 #endif // _INCLUDE_OPENMRN_FEATURES_

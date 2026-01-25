@@ -40,9 +40,7 @@
 #include <unistd.h>
 #include "openmrn_features.h"
 #include "utils/logging.h"
-#ifdef __FreeRTOS__
 #include "can_ioctl.h"
-#endif
 
 #include "openlcb/ConfigUpdateFlow.hxx"
 
@@ -115,11 +113,8 @@ void FileMemorySpace::ensure_file_open()
         if (read_only()) {
             opts = O_RDONLY;
         } else {
-            opts = O_RDWR;
+            opts = O_RDWR | O_NONBLOCK;
         }
-#ifdef __FreeRTOS__
-        opts |= O_NONBLOCK;
-#endif
         fd_ = open(name_, opts);
         if (fd_ < 0)
         {
@@ -160,10 +155,8 @@ size_t FileMemorySpace::write(address_t destination, const uint8_t *data,
     }
     else if ((size_t)ret < len)
     {
-#ifdef __FreeRTOS__
         *error = ERROR_AGAIN;
         HASSERT(ioctl(fd_, CAN_IOC_WRITE_ACTIVE, again) == 0);
-#endif
         return ret;
     }
     else
@@ -211,10 +204,8 @@ size_t FileMemorySpace::read(address_t destination, uint8_t *dst, size_t len,
     }
     else if ((size_t)ret < len)
     {
-#ifdef __FreeRTOS__
         *error = ERROR_AGAIN;
         HASSERT(ioctl(fd_, CAN_IOC_READ_ACTIVE, again) == 0);
-#endif
         return ret;
     }
     else

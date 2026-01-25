@@ -39,10 +39,6 @@
 extern "C" {
 #endif
 
-#if defined (__FreeRTOS__)
-extern void os_thread_start(void *arg);
-#endif // __FreeRTOS__
-
 /// Locks a single global Atomic used to guard some OS structures.
 void os_atomic_lock(void);
 /// Unlocks a single global Atomic used to guard some OS structures.

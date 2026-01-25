@@ -36,10 +36,7 @@
 #define _OS_MDNS_HXX_
 
 #include <stdint.h>
-
-#if defined(__FreeRTOS__)
 #include <netdb.h>
-#endif
 
 struct addrinfo;
 

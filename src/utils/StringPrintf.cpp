@@ -36,11 +36,7 @@
 
 std::string StringPrintf(const char *format, ...)
 {
-#ifdef __FreeRTOS__
-    static const int kBufSize = 64;
-#else
-    static const int kBufSize = 1000;
-#endif
+    static const int kBufSize = 64; // ThreadX embedded system - use smaller buffer
     char buffer[kBufSize];
     va_list ap;
 

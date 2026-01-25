@@ -37,91 +37,13 @@
 #ifndef _UTILS_ATOMIC_HXX_
 #define _UTILS_ATOMIC_HXX_
 
-#ifdef __FreeRTOS__
-#include <stdint.h>
-#include "FreeRTOS.h"
-//#include "freertos/portmacro.h"
-
-/// Lightweight locking class for protecting small critical sections.
-///
-/// Properties:
-/// - May be recursively acquired
-/// - FreeRTOS: No call inside an Atomic-protected section may block
-/// - FreeRTOS: Not allowed to use from interrupt context. Kernel-compatible
-///   ISRs are disabled during an Atomic held.
-///
-/// Under FreeRTOS locking a mutex is more than 2x more expensive than locking
-/// an Atomic. On desktop OS's Atomic is just a recursive mutex.
-///
-/// Usage: Declare Atomic as a private base class, add a class member
-/// variable or a global variable of type Atomic. Then use AtomicHolder to
-/// protect the critical sections.
-class Atomic
-{
-public:
-    /// Locks the specific critical section.
-    void lock()
-    {
-        portENTER_CRITICAL();
-    }
-    /// Unlocks the specific critical section.
-    void unlock()
-    {
-        portEXIT_CRITICAL();
-    }
-};
-
-#elif defined(__FreeRTOS__)
-
-#include "rtos_includes.h"
-
-/// Lightweight locking class for protecting small critical sections.
-///
-/// Properties:
-/// - May be recursively acquired
-/// - FreeRTOS: No call inside an Atomic-protected section may block
-/// - FreeRTOS: Not allowed to use from interrupt context. Kernel-compatible
-///   ISRs are disabled during an Atomic held.
-///
-/// Under FreeRTOS locking a mutex is more than 2x more expensive than locking
-/// an Atomic. On desktop OS's Atomic is just a recursive mutex.
-///
-/// Usage: Declare Atomic as a private base class, add a class member
-/// variable or a global variable of type Atomic. Then use AtomicHolder to
-/// protect the critical sections.
-class Atomic
-{
-public:
-    /// Locks the specific critical section.
-    void lock()
-    {
-        portENTER_CRITICAL_SAFE(&mux);
-    }
-    /// Unlocks the specific critical section.
-    void unlock()
-    {
-        portEXIT_CRITICAL_SAFE(&mux);
-    }
-
-private:
-    /// Performs fine-grained spinloop locking.
-    portMUX_TYPE mux = portMUX_INITIALIZER_UNLOCKED;
-};
-
-#else
-
 #include "os/OS.hxx"
 
 /// Lightweight locking class for protecting small critical sections.
 ///
 /// Properties:
 /// - May be recursively acquired
-/// - FreeRTOS: No call inside an Atomic-protected section may block
-/// - FreeRTOS: Not allowed to use from interrupt context. Kernel-compatible
-///   ISRs are disabled during an Atomic held.
-///
-/// Under FreeRTOS locking a mutex is more than 2x more expensive than locking
-/// an Atomic. On desktop OS's Atomic is just a recursive mutex.
+/// - ThreadX: Uses recursive mutexes for thread-safe protection
 ///
 /// Usage: Declare Atomic as a private base class, add a class member
 /// variable or a global variable of type Atomic. Then use AtomicHolder to
@@ -149,9 +71,7 @@ private:
 #endif
 
 /// See @ref OSMutexLock in os/OS.hxx
-class AtomicHolder
-{
-public:
+cl:
     /// Constructor. Grabs the mutex as a side effect.
     ///
     /// @param parent the mutex (atomic) to hold.
