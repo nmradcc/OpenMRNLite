@@ -68,10 +68,10 @@ private:
     os_mutex_t mu_ = OS_RECURSIVE_MUTEX_INITIALIZER;
 };
 
-#endif
-
 /// See @ref OSMutexLock in os/OS.hxx
-cl:
+class AtomicHolder
+{
+public:
     /// Constructor. Grabs the mutex as a side effect.
     ///
     /// @param parent the mutex (atomic) to hold.
@@ -106,4 +106,4 @@ private:
 /// it does not actually keep the lock.
 #define AtomicHolder(l) int error_omitted_lock_holder_variable[-1]
 
-#endif // _UTILS_LOCK_HXX_
+#endif // _UTILS_ATOMIC_HXX_

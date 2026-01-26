@@ -286,6 +286,92 @@ void ExecutorBase::shutdown()
     }
 }
 
+/** Adds a Selectable to the executor's select set.
+ * @param s the Selectable to add to the select set.
+ */
+void ExecutorBase::select(Selectable *s)
+{
+    HASSERT(s != nullptr);
+    HASSERT(s->fd() <= Selectable::MAX_FD);
+    
+    int fd = s->fd();
+    if (fd >= selectNFds_)
+    {
+        selectNFds_ = fd + 1;
+    }
+    
+    switch (s->type())
+    {
+        case Selectable::READ:
+            FD_SET(fd, &selectRead_);
+            break;
+        case Selectable::WRITE:
+            FD_SET(fd, &selectWrite_);
+            break;
+        case Selectable::EXCEPT:
+            FD_SET(fd, &selectExcept_);
+            break;
+        default:
+            break;
+    }
+}
+
+/** Checks if a Selectable is currently in the executor's select set.
+ * @param s the Selectable to check.
+ * @return true if the Selectable is in the select set.
+ */
+bool ExecutorBase::is_selected(Selectable *s)
+{
+    HASSERT(s != nullptr);
+    
+    int fd = s->fd();
+    if (fd >= selectNFds_)
+    {
+        return false;
+    }
+    
+    switch (s->type())
+    {
+        case Selectable::READ:
+            return FD_ISSET(fd, &selectRead_) ? true : false;
+        case Selectable::WRITE:
+            return FD_ISSET(fd, &selectWrite_) ? true : false;
+        case Selectable::EXCEPT:
+            return FD_ISSET(fd, &selectExcept_) ? true : false;
+        default:
+            return false;
+    }
+}
+
+/** Removes a Selectable from the executor's select set.
+ * @param s the Selectable to remove from the select set.
+ */
+void ExecutorBase::unselect(Selectable *s)
+{
+    HASSERT(s != nullptr);
+    
+    int fd = s->fd();
+    if (fd >= selectNFds_)
+    {
+        return;  // Not in set
+    }
+    
+    switch (s->type())
+    {
+        case Selectable::READ:
+            FD_CLR(fd, &selectRead_);
+            break;
+        case Selectable::WRITE:
+            FD_CLR(fd, &selectWrite_);
+            break;
+        case Selectable::EXCEPT:
+            FD_CLR(fd, &selectExcept_);
+            break;
+        default:
+            break;
+    }
+}
+
 ExecutorBase::~ExecutorBase()
 {
     if (!done_)

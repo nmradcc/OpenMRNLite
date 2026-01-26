@@ -42,6 +42,7 @@
 #include "executor/Executable.hxx"
 #include "executor/Notifiable.hxx"
 #include "executor/Timer.hxx"
+#include "executor/Selectable.hxx"
 #include "utils/Queue.hxx"
 #include "utils/SimpleQueue.hxx"
 #include "utils/LinkedObject.hxx"
@@ -129,6 +130,19 @@ public:
     /// Helper function for debugging and tracing.
     /// @return currently running executable or nullptr if none active.
     Executable* current() { return current_; }
+
+    /// Adds a Selectable to the executor's select set.
+    /// @param s the Selectable to add to the select set.
+    void select(Selectable *s);
+
+    /// Checks if a Selectable is currently in the executor's select set.
+    /// @param s the Selectable to check.
+    /// @return true if the Selectable is in the select set.
+    bool is_selected(Selectable *s);
+
+    /// Removes a Selectable from the executor's select set.
+    /// @param s the Selectable to remove from the select set.
+    void unselect(Selectable *s);
     
 protected:
     /** Thread entry point.
@@ -168,6 +182,15 @@ private:
     /// How many executables we schedule blindly before calling a select() in
     /// order to find more data to read/write in the FDs being waited upon.
     unsigned selectPrescaler_ : 5;
+
+    /// File descriptor set for select() read operations.
+    fd_set selectRead_;
+    /// File descriptor set for select() write operations.
+    fd_set selectWrite_;
+    /// File descriptor set for select() exception operations.
+    fd_set selectExcept_;
+    /// Number of file descriptors to monitor in select().
+    int selectNFds_;
 
 protected:
     /// Sequence number.
@@ -237,7 +260,6 @@ public:
     {
         queue_.insert(
             msg, priority >= NUM_PRIO ? NUM_PRIO - 1 : priority);
-        selectHelper_.wakeup();
     }
 
 #if OPENMRN_FEATURE_RTOS_FROM_ISR
@@ -250,7 +272,6 @@ public:
     {
         queue_.insert_locked(
             msg, priority >= NUM_PRIO ? NUM_PRIO - 1 : priority);
-        selectHelper_.wakeup_from_isr();
     }
 #endif // OPENMRN_FEATURE_RTOS_FROM_ISR
 

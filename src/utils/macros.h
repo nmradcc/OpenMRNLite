@@ -77,26 +77,6 @@ extern const char* g_death_file;
 
 #define DIE(MSG) abort()
 
-#else
-
-#include <assert.h>
-#include <stdio.h>
-
-#ifdef NDEBUG
-#define HASSERT(x) do { if (!(x)) { fprintf(stderr, "Assertion failed in file " __FILE__ " line %d: assert(" #x ")\n", __LINE__); g_death_file = __FILE__; g_death_lineno = __LINE__; abort();} } while(0)
-#else
-/// Checks that the value of expression x is true, else terminates the current
-/// process.
-/// @param x is the assertion expression that should evaluate to true.
-#define HASSERT(x) do { assert(x); } while(0)
-#endif
-
-/// Unconditionally terminates the current process with a message.
-/// @param MSG is the message to print as cause of death.
-#define DIE(MSG) do { fprintf(stderr, "Crashed in file " __FILE__ " line %d: " MSG "\n", __LINE__); g_death_file = __FILE__; g_death_lineno = __LINE__; abort(); } while(0)
-
-#endif
-
 #ifdef NDEBUG
 
 /** Debug assertion facility. Will terminate the program if the program was

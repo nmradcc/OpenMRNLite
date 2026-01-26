@@ -55,10 +55,7 @@ class OpenMRN : private Executable
 {
 public:
     /// Constructor - requires Node ID
-    OpenMRN(openlcb::NodeID node_id)
-    {
-        stack_.emplace(node_id);
-    }
+    OpenMRN(openlcb::NodeID node_id);
 
     /// @return pointer to the OpenMRN stack
     openlcb::SimpleCanStack *stack()

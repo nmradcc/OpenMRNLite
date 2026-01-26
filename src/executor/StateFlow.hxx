@@ -42,6 +42,7 @@
 
 #include "executor/Service.hxx"
 #include "executor/Timer.hxx"
+#include "executor/Selectable.hxx"
 #include "utils/Buffer.hxx"
 #include "utils/Queue.hxx"
 #include "utils/LinkedObject.hxx"

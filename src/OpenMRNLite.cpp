@@ -40,7 +40,7 @@ namespace openmrn_arduino {
 
 OpenMRN::OpenMRN(openlcb::NodeID node_id)
 {
-    init(node_id);
+    stack_.emplace(node_id);
 }
 
 } // namespace openmrn_arduino

@@ -101,6 +101,7 @@ void hw_postinit(void)
 {
 }
 
+#if !OPENMRN_FEATURE_RTOS_THREADX
 /** One time intialization routine
  * @param once one time instance
  * @param routine method to call once
@@ -143,7 +144,6 @@ int os_thread_once(os_thread_once_t *once, void (*routine)(void))
 
     return 0;
 }
-#endif
 
 /** Create a thread.
  * @param thread handle to the created thread
@@ -229,7 +229,6 @@ int os_thread_create(os_thread_t *thread, const char *name, int priority,
 
     return result;
 #endif // OPENMRN_FEATURE_THREAD_PTHREAD
-}
 #endif // !OPENMRN_FEATURE_RTOS_THREADX
 
 /// Implement this function to read timing more accurately than 1 msec in
